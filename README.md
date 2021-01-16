@@ -1,4 +1,4 @@
-# analytics
+# climatemind-analytics
 Climate Mind app analytics
 
 
