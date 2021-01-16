@@ -2,5 +2,39 @@
 Climate Mind app analytics
 
 
-Uses miniconda to manage the python version and package dependencies.
+This repo uses Miniconda3 to manage the python version and package dependencies.
+
+If you have a macOS, you can install Miniconda from homebrew simply by runing `brew install --cask miniconda`.
+If you are using Linux or Windows, you can follow the installation guide for Linux [https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html] and for Windows [https://docs.conda.io/projects/conda/en/latest/user-guide/install/windows.html].
+
+Type `conda` in your terminal to confirm installation success.
+
+Change the directory to your cloned version of this analytics repo, then follow the instructions below.
+
+Install the conda environment by doing:
+```conda env create -f environment.yml```
+
+Once installed, activate the environment by doing:
+```conda activate analytics_env ```
+
+If you are having problem with the conda activate command, you might want to take a look at this stackoverflow thread.
+https://stackoverflow.com/questions/47246350/conda-activate-not-working
+
+If the code dependencies in this repo have changed or update, you will need to update your conda environment by doing:
+```conda env update -f environment.yml``` 
+
+
+Adding Conda to Jupyter Notebook
+Unfortunately, installing miniconda on your terminal does not mean it will be working in Jupyter Notebook.
+To be able to select a conda environment as the kernel in Jupyter, you need to install `ipykernel` in that environment.
+
+```
+conda activate condaenv
+conda install ipykernel
+python3 -m ipykernel install --user --name analytics_env --display-name "analytics_env"
+```
+
+Once you have done this, you could start up the notebook by using the `jupyter notebook` command and then open any .ipynb notebook. 
+Inside that notebook, select the menu Kernel > Change kernel > Python3 (condaenv) to activate the conda environment kernel.
+
 
