@@ -35,6 +35,10 @@ python3 -m ipykernel install --user --name analytics_env --display-name "analyti
 ```
 
 Once you have done this, you could start up the notebook by using the `jupyter notebook` command and then open any .ipynb notebook. 
-Inside that notebook, select the menu Kernel > Change kernel > Python3 (condaenv) to activate the conda environment kernel.
+Inside that notebook, select the menu Kernel > Change kernel > analytics_env to activate the conda environment kernel.
 
+
+
+To remove Conda environments from the cache to free up RAM space, run:
+```conda clean --all```
 
