@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "climate-mind-webapp",
+  "private_key_id": "165fa69acc557a98d5b0ccbf424f4c9247ace145",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDYoocoW1cz+S0e\nbJKwGixkYbO+0gWdl+3Jm3vwjNH1KNMPbUeY7qiJbVMqqT2i5iJT8r06x4HDh7zk\nC059+Vu0yhFbn2iU0RZ7mTIBQKs9g4KkfrKNHuaXnz+f8SCMldH1oafPw4YzzgLq\ntELOcqpPlTSnisjibKstSYb0t29AZUPd6Vx042jlgv2xRR/MB1FQSXGkY/Mp3Tps\nXOyUy3FPdNkzloKCxELj0ccjl1VykblsW073BhheAgVomG2e5GuK0LU9BB/GFiEg\nO2bglY7TIqiNj4rUX2AzxDyW10WjfanKolIARXp95VXDZATGApKfw45R0g9FrWrs\nYRYQvolFAgMBAAECggEAAMVEJs8srICdcAwmvjFi3x1OULe3YD5Scz9Twrm1gaI8\nz35t+n+NSYjHIhHUbUIaOgDBdcnzCY+DixF//yryZkrOLHZfvA0Cf/aWk3JVetRX\nu4GE8U0tpQgJ8WX4cWZYGrslb2UaJpp8B8l2SHMEgRGUc/HN7wuicoxKmUEWjUG8\nC2l0TmZCxlT1iSbnSpVX2yHQe+zT9tTlVkdBpYlzzq8JhB5YAVGp1Aube5p95664\n4dL/YsbfitIyggMjaGkAm9UNU8ztkRKjw7MoM1d/PwToSefDLFKOHNPEdCm7se8g\nedALy1eZnS1bsRvdmIiElFFjs5+XO9eV8jmPUjqMsQKBgQD+3yMz0N/MmWH5BplH\nk3XVXgyKrvGxYUKRxhT5mcF4rm69UPOzY3p/lVBGYQZjqjaJUk2B9W2ZfpFxKqKh\nVaDyNHQWTh+1xpICmxxKy7Qh3E4x2aMxXMOeEUycEoz2N0InmYLp4ovyJAU41aE2\nADOXcZTQxoXimNHJYWnhNKC+KQKBgQDZmA3kNTyQ9eCKZQEZcyFeXXXLfrZsOcjk\nb2WOLRDboajBn0t0DITGingNmdXIKA2G7s7uqeFM0cmXhIE59yBP1K+RiXQf1B96\nRD8xVAT6MA/OjQJE2MHCOLs8aAoYtfaMsN3He9xiXvl49SyDkyAqCGoav2STV90W\nnxBfHjudvQKBgFUdM2ZUdMig2GUPXRTYG9u7YrjVn4U7E74Wxl5siH3C0tyKMjhQ\nGlKNDJfUQwv5hejqAVRLH+TIrc17DYCPVgZMmg/w2wobXBterV4VFPzR05M2ORd9\nAR7CbDEayNRYs9EBpQRyUYX1nYDTZtjfzFrg5W+rPH7lxflYfMFmj9+xAoGAQKZ8\n+iEXLbrgTD5WZUlf0LnUFfJAIUfJ+JVghy28pIUTrvO1Z3WQvazGnsPmUOIVotGx\nihfPaROr4ejsvFxArXdz8rn0VsCf2aQNYoqkL/G3wJcE5Y/BggN5HimLVmw6JPMn\n8e1LPa8aUGYII8/C7roxTGExcNXaSq5YHurMq8ECgYA+v/48pqjbogPg7oEMC6fD\n7M/vLTC0bYKkvWH1goza10CIkrXfAaiIfpUzhOVe0J99ee5UXHQSRNN7tj2YYalM\nlvYRyrSHt1rRQuxuw768XOMyKvOwHwoqz7rHYI7aJ92Lzjp4WGo+1ZCG/Otwxzm3\n0SD/3gwSB4r9ajS0zaXa+A==\n-----END PRIVATE KEY-----\n",
+  "client_email": "admin-373@climate-mind-webapp.iam.gserviceaccount.com",
+  "client_id": "111743418035090252996",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/admin-373%40climate-mind-webapp.iam.gserviceaccount.com"
+}
