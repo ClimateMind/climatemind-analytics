@@ -5,7 +5,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 
 SCOPES = ['https://www.googleapis.com/auth/analytics.readonly']
-KEY_FILE_LOCATION = 'climate-mind-webapp-165fa69acc55.json'
+KEY_FILE_LOCATION = 'secret.json'
 VIEW_ID = '232128049'
 
 
