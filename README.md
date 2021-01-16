@@ -50,3 +50,8 @@ To remove Conda environments from the cache to free up RAM space, run:
 conda clean --all
 ```
 
+How to run the Climate Mind analytics pipeline:
+1. Get authorization to access the Climate Mind analytics data by contacting Andrew Banister on the team (awban22@gmail.com).
+2. Add the secret JSON file to your climatemind-analytics directory
+IMPORTANT: Ensure you don't change the JSON file name so it can't accidentally commit it to github, because it's secret and included as a .gitignore file!
+3. Run the CM_analytics.py script.
