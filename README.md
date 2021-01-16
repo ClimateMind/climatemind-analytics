@@ -52,7 +52,7 @@ conda clean --all
 
 How to run the Climate Mind analytics pipeline:
 1. Get authorization to access the Climate Mind analytics data by contacting Andrew Banister on the team (awban22@gmail.com).
-2. Add the secret JSON file to your climatemind-analytics directory
-IMPORTANT: Ensure you don't change the JSON file name so it can't accidentally commit it to github, because it's secret and included as a .gitignore file!
+2. Change the name of the JSON file Andrew sends you to `secret.json` and move it to your climatemind-analytics directory
+IMPORTANT: Ensure you change the JSON file name so it can't accidentally commit it to github, because it's secret and included as a .gitignore file!
 3. Install and activate the Conda environment following the instructions in the above sections of this readme.
 4. Run the CM_analytics.py script in the activated Conda environment.
