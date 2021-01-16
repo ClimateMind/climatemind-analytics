@@ -9,7 +9,7 @@ If you are using Linux or Windows, you can follow the installation guide for Lin
 
 Type `conda` in your terminal to confirm installation success.
 
-Change the directory to your cloned version of this analytics repo, then follow the instructions below.
+***Change the directory to your cloned version of this analytics repo, then follow the instructions below.***
 
 Install the conda environment by doing:
 ```
