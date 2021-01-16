@@ -12,16 +12,22 @@ Type `conda` in your terminal to confirm installation success.
 Change the directory to your cloned version of this analytics repo, then follow the instructions below.
 
 Install the conda environment by doing:
-```conda env create -f environment.yml```
+```
+conda env create -f environment.yml
+```
 
 Once installed, activate the environment by doing:
-```conda activate analytics_env ```
+```
+conda activate analytics_env
+```
 
 If you are having problem with the conda activate command, you might want to take a look at this stackoverflow thread.
 https://stackoverflow.com/questions/47246350/conda-activate-not-working
 
 If the code dependencies in this repo have changed or update, you will need to update your conda environment by doing:
-```conda env update -f environment.yml``` 
+```
+conda env update -f environment.yml
+``` 
 
 
 Adding Conda to Jupyter Notebook
@@ -40,5 +46,7 @@ Inside that notebook, select the menu Kernel > Change kernel > analytics_env to 
 
 
 To remove Conda environments from the cache to free up RAM space, run:
-```conda clean --all```
+```
+conda clean --all
+```
 
