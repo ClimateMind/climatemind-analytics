@@ -9,7 +9,7 @@ If you are using Linux or Windows, you can follow the installation guide for Lin
 
 Type `conda` in your terminal to confirm installation success.
 
-Change the directory to your cloned version of this analytics repo, then follow the instructions below.
+***Change the directory to your cloned version of this analytics repo, then follow the instructions below.***
 
 Install the conda environment by doing:
 ```
@@ -50,3 +50,9 @@ To remove Conda environments from the cache to free up RAM space, run:
 conda clean --all
 ```
 
+How to run the Climate Mind analytics pipeline:
+1. Get authorization to access the Climate Mind analytics data by contacting Andrew Banister on the team (awban22@gmail.com).
+2. Change the name of the JSON file Andrew sends you to `secret.json` and move it to your climatemind-analytics directory
+IMPORTANT: Ensure you change the JSON file name so it can't accidentally commit it to github, because it's secret and included as a .gitignore file!
+3. Install and activate the Conda environment following the instructions in the above sections of this readme.
+4. Run the CM_analytics.py script in the activated Conda environment.
