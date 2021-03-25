@@ -1,1 +1,4 @@
 secret.json
+secret_db_credentials.py
+__pycache__
+.idea
