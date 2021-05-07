@@ -34,14 +34,16 @@
 # fig1.write_html("images/fig1.html")
 
 
-"""analytics"""
-
-# Load the files exported from SQL.
-
 from matplotlib import pyplot as plt
+
 import pandas as pd
 import pickle
 import os
+
+# Makes plots look nicer.
+from matplotlib import rcParams
+rcParams.update({'figure.autolayout': True})
+
 
 pickle_files_root_dir = 'data'
 scores = pd.read_csv(pickle_files_root_dir + '/scores.csv')  # Scores table
@@ -125,7 +127,7 @@ def kpi5():
         v1 = v1.shift(-1)
 
         # Filter out all times larger than 10 minutes.
-        v1 = v1[v1 < pd.Timedelta(minutes = 10)]
+        v1 = v1[v1 < pd.Timedelta(minutes=10)]
         # Note that we can't get the last value because there are no cards clicked after the last one (to diff).
         for index, value in v["value"].iteritems():
             if index not in v1: continue
@@ -135,12 +137,12 @@ def kpi5():
         # Take the median, get seconds.
         card_read_times[k] = v.quantile(0.5).seconds
 
-        if(v.size < 5):
+        if (v.size < 5):
             print(f"Warning: only {v.size} people read {iri_node_map[k]}")
     readtime = pd.Series(card_read_times).sort_values().reset_index()
     readtime['index'] = readtime['index'].map(iri_node_map)
 
-    readtime.plot.barh(y=0, x="index", figsize=(10, 15))
+    readtime.plot.barh(y=0, x="index")
 
 
 # KPI 4 -- average question completion time
@@ -176,7 +178,7 @@ def kpi3_v2():
         pv_clicked[a] = b[a].reset_index()
 
         pv_clicked[a]["value"] = pv_clicked[a]["value"].map(iri_node_map)
-        pv_clicked[a].sort_values(ascending=False, by=0).plot.bar(x="value", y=0, figsize=(20, 8),
+        pv_clicked[a].sort_values(ascending=False, by=0).plot.bar(x="value", y=0,
                                                                   title='All clicks' if not a else a,
                                                                   ylabel="num clicks")
 
@@ -188,7 +190,7 @@ def kpi3():
         'session_uuid').count()
 
     # Clicks must be smaller than 21 for it to be included. More than 21 clicks doesn't make sense.
-    clicks_by_uuid[clicks_by_uuid["value"] <= 21].boxplot(figsize=(10, 10), title="Cards clicked per user")
+    clicks_by_uuid[clicks_by_uuid["value"] <= 21].boxplot( title="Cards clicked per user")
 
 
 # KPI 3 -- same as KPI 3, but one graph for each personal value.
@@ -199,5 +201,35 @@ def kpi3_v3():
     group_clicked.plot.bar()
 
 
-kpi5()
+# Cards clicked vs card order.
+def kpi1():
+    analytics_renamed = analytics[analytics['category'] == 'card']
+    analytics_renamed = analytics.rename(columns={'value': 'effect_iri'})
+
+    # Remove duplicate clicks from same session_uuid
+    analytics_renamed = analytics_renamed.drop_duplicates(['session_uuid', 'effect_iri'])
+    clicks = cf.merge(analytics_renamed, how="left", on=["session_uuid", "effect_iri"])
+    clicksarray = [0] * 21
+    shownarray = [0] * 21
+
+    for _, row in clicks[['effect_position', 'analytics_id']].iterrows():
+        if not pd.isnull(row['analytics_id']):
+            clicksarray[int(row['effect_position']) - 1] += 1
+        shownarray[int(row['effect_position']) - 1] += 1
+    print(clicksarray, shownarray)
+    pd.Series(clicksarray).plot.bar(title="Cards clicked vs card order", ylabel="Number of clicks",
+                                    xlabel="Card order (0-indexed)")
+
+
+def kpi2():
+    for pv, clicks in grouped.count().groupby(level=0):
+        fig, ax = plt.subplots()
+        clicks = clicks['analytics_id'].droplevel(0).rename(index=iri_node_map).sort_values()
+        clicks.plot.bar(ax = ax, subplots = True, ylabel="Card", title=pv, xlabel="Clicks")
+
+
+
+# Entrypoint here:
+# Just run any function kpi* and it will start matplotlib plots.
+kpi3_v2()
 plt.show()
