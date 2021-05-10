@@ -102,6 +102,8 @@ grouped = cards_clicked.groupby(['pv', 'value'])  # cards that are clicked
 # same as grouped, but data includes all cards shown to the user., instead of cards clicked.
 grouped_shown = cards_shown.groupby(['pv', 'value'])
 
+cards_opened_not_closed = []
+
 
 # KPI 5
 # Average time reading a card by card (filter out cards that don’t have a corresponding close event)
@@ -117,14 +119,25 @@ def kpi5():
         v['event_timestamp'] = v['event_timestamp'].map(lambda a: datetime.fromisoformat(a))
         v = v.sort_values(['value', 'event_timestamp'])
 
+        # Stores when a particular card was opened.
+        # Keyed by card value, stores information about a particular open event.
+        # When we find a close event, match it with the open event, calculate the time in between,
+        # and delete the open event.
         open_time = dict()
 
         for index, row in v.iterrows():
             if row["value"] not in open_time:
-                open_time[row["value"]] = row["event_timestamp"]
+                open_time[row["value"]] = row
             else:
-                card_read_times[row["value"]][index] = row["event_timestamp"] - open_time[row["value"]]
+                card_read_times[row["value"]][index] = row["event_timestamp"] - open_time[row["value"]][
+                    "event_timestamp"]
+
+                # Have found a close event. Delete that value from open_time
                 del open_time[row["value"]]
+
+        # Search for what cards were opened and not closed for KPI 6
+        # If all cards opened are closed, then open_time dict should be empty.
+        cards_opened_not_closed.extend(open_time.values())
     for k, v in card_read_times.items():
         # Take the median, get seconds.
         card_read_times[k] = v.quantile(0.5).seconds
@@ -132,9 +145,18 @@ def kpi5():
         if (v.size < 5):
             print(f"Warning: only {v.size} people read {iri_node_map[k]}")
     readtime = pd.Series(card_read_times).sort_values().reset_index()
-    readtime['index'] = readtime['index'].map(iri_node_map)
-    readtime.rename(columns={'index': 'Card', 0: 'Median read time in seconds'}, inplace=True)
-    readtime.plot.barh(y='Median read time in seconds', x="Card", figsize=(10, 10))
+    readtime['Card Name'] = readtime['index'].map(iri_node_map)
+    readtime['Median read time in seconds'] = readtime[0]
+    readtime.plot.barh(y='Median read time in seconds', x="Card Name", figsize=(10, 10))
+
+
+def kpi6():
+    cards_opened_not_closed.clear()
+    kpi5()
+    df = pd.DataFrame(cards_opened_not_closed)['value'].value_counts().reset_index()
+    df['Card Names'] = df['index'].map(iri_node_map)
+    df["Number of drop offs"] = df["value"]
+    df.plot.barh(y="Number of drop offs", x="Card Names", figsize=(10, 10), title = "Number of drop offs for each card")
 
 
 # KPI 4 -- average question completion time
@@ -222,5 +244,5 @@ def kpi2():
 
 # Entrypoint here:
 # Just run any function kpi* and it will start matplotlib plots.
-kpi5()
+kpi6()
 plt.show()
