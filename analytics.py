@@ -42,8 +42,8 @@ import os
 
 # Makes plots look nicer.
 from matplotlib import rcParams
-rcParams.update({'figure.autolayout': True})
 
+rcParams.update({'figure.autolayout': True})
 
 pickle_files_root_dir = 'data'
 scores = pd.read_csv(pickle_files_root_dir + '/scores.csv')  # Scores table
@@ -114,25 +114,17 @@ def kpi5():
 
     card_read_times = defaultdict(default_series)  # Key: card value, Value: read times
     for k, v in analytics[analytics['action'] == 'card_click'].groupby('session_uuid'):
-        v1 = v['event_timestamp'].map(lambda a: datetime.fromisoformat(a)).sort_values()
+        v['event_timestamp'] = v['event_timestamp'].map(lambda a: datetime.fromisoformat(a))
+        v = v.sort_values(['value', 'event_timestamp'])
 
-        # .diff returns the difference in successive values, which is what we want.
-        v1 = v1.diff()
+        open_time = dict()
 
-        # necessary to get the correct values.
-        # for Series v1, v1.diff() maps v1[a+1] => v1[a+1] - v1[a]
-        # The correct mapping should be v1[a] => v1[a+1] - v1[a].
-        #        in other words, the time taken to read this question = start of next question - start of this question
-        # Therefore, we shift the index by -1 to get this correct mapping.
-        v1 = v1.shift(-1)
-
-        # Filter out all times larger than 10 minutes.
-        v1 = v1[v1 < pd.Timedelta(minutes=10)]
-        # Note that we can't get the last value because there are no cards clicked after the last one (to diff).
-        for index, value in v["value"].iteritems():
-            if index not in v1: continue
-            if pd.isnull(v1[index]): continue
-            card_read_times[value][index] = v1[index]
+        for index, row in v.iterrows():
+            if row["value"] not in open_time:
+                open_time[row["value"]] = row["event_timestamp"]
+            else:
+                card_read_times[row["value"]][index] = row["event_timestamp"] - open_time[row["value"]]
+                del open_time[row["value"]]
     for k, v in card_read_times.items():
         # Take the median, get seconds.
         card_read_times[k] = v.quantile(0.5).seconds
@@ -141,8 +133,8 @@ def kpi5():
             print(f"Warning: only {v.size} people read {iri_node_map[k]}")
     readtime = pd.Series(card_read_times).sort_values().reset_index()
     readtime['index'] = readtime['index'].map(iri_node_map)
-
-    readtime.plot.barh(y=0, x="index")
+    readtime.rename(columns={'index': 'Card', 0: 'Median read time in seconds'}, inplace=True)
+    readtime.plot.barh(y='Median read time in seconds', x="Card", figsize=(10, 10))
 
 
 # KPI 4 -- average question completion time
@@ -190,7 +182,7 @@ def kpi3():
         'session_uuid').count()
 
     # Clicks must be smaller than 21 for it to be included. More than 21 clicks doesn't make sense.
-    clicks_by_uuid[clicks_by_uuid["value"] <= 21].boxplot( title="Cards clicked per user")
+    clicks_by_uuid[clicks_by_uuid["value"] <= 21].boxplot(title="Cards clicked per user")
 
 
 # KPI 3 -- same as KPI 3, but one graph for each personal value.
@@ -225,11 +217,10 @@ def kpi2():
     for pv, clicks in grouped.count().groupby(level=0):
         fig, ax = plt.subplots()
         clicks = clicks['analytics_id'].droplevel(0).rename(index=iri_node_map).sort_values()
-        clicks.plot.bar(ax = ax, subplots = True, ylabel="Card", title=pv, xlabel="Clicks")
-
+        clicks.plot.bar(ax=ax, subplots=True, ylabel="Card", title=pv, xlabel="Clicks")
 
 
 # Entrypoint here:
 # Just run any function kpi* and it will start matplotlib plots.
-kpi3_v2()
+kpi5()
 plt.show()
