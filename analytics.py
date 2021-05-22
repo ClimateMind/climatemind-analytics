@@ -37,13 +37,22 @@
 from matplotlib import pyplot as plt
 
 import pandas as pd
+
+pd.options.plotting.backend = "plotly"
 import pickle
 import os
+import plotly.express as px
 
 # Makes plots look nicer.
 from matplotlib import rcParams
 
 rcParams.update({'figure.autolayout': True})
+
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+
+app = dash.Dash(__name__)
 
 pickle_files_root_dir = 'data'
 scores = pd.read_csv(pickle_files_root_dir + '/scores.csv')  # Scores table
@@ -107,7 +116,6 @@ cards_opened_not_closed = []
 
 # KPI 5
 # Average time reading a card by card (filter out cards that don’t have a corresponding close event)
-# I don't see a card_close event, so reading time for card 1 = (timestamp open card2) - (timestamp open card1)
 def kpi5():
     from collections import defaultdict
     from datetime import datetime
@@ -156,31 +164,53 @@ def kpi6():
     df = pd.DataFrame(cards_opened_not_closed)['value'].value_counts().reset_index()
     df['Card Names'] = df['index'].map(iri_node_map)
     df["Number of drop offs"] = df["value"]
-    df.plot.barh(y="Number of drop offs", x="Card Names", figsize=(10, 10), title = "Number of drop offs for each card")
+    df.plot.barh(y="Number of drop offs", x="Card Names", figsize=(10, 10), title="Number of drop offs for each card")
 
+
+prevfig = None
 
 # KPI 4 -- average question completion time
-def kpi4():
-    from datetime import datetime
+# Calculated by taking the start time of the next question, subtracted the start time of previous question.
+@app.callback(
+    [dash.dependencies.Output("kpi4-graph", "figure"), dash.dependencies.Output("sample-size-header", "children")],
+    [dash.dependencies.Input('date-range-slider', 'value')])
+def kpi4(value):
+    from datetime import datetime, timedelta
+    global prevfig
 
-    temp = analytics[analytics['category'] == 'questionnaire'].sort_values("event_timestamp")
+    fromdate = datetime.now() - timedelta(days=-value[0])
+    todate = datetime.now() - timedelta(days=-value[1])
+
+    analytics["event_timestamp"] = pd.to_datetime(analytics["event_timestamp"])
+
+    date_filtered_analytics = analytics[
+        (analytics["event_timestamp"] >= fromdate) & (analytics["event_timestamp"] <= todate)]
+    temp = date_filtered_analytics[date_filtered_analytics['category'] == 'questionnaire'].sort_values(
+        "event_timestamp")
 
     questions_no_dups = pd.DataFrame(columns=temp.columns)
     for user_id, question_data in temp.groupby('session_uuid'):
         questions_sorted = question_data.drop_duplicates(subset='value')
 
-        prevtime = datetime.fromisoformat(questions_sorted.iloc[0, :]["event_timestamp"])
+        prevtime = questions_sorted.iloc[0, :]["event_timestamp"]
         for index, row in questions_sorted.iterrows():
-            curtime = datetime.fromisoformat(row["event_timestamp"])
+            curtime = row["event_timestamp"]
             questions_sorted.loc[index, "time"] = (curtime - prevtime).seconds
             prevtime = curtime
         questions_no_dups = questions_no_dups.append(questions_sorted)
     questions_no_dups["value"] = questions_no_dups["value"].astype('float64')
+
+    # Reverse the order of questions (higher value = first in question order).
     questions_no_dups["value"] = questions_no_dups["value"].map(lambda k: 10 - k)
 
-    # First question is 1. Last question is 10 (there's no value for 10 because analytics events haven't been implemented for last question yet).
-    questions_no_dups.groupby('value').mean().plot.bar(title="Question completion time (seconds) for question order")
+    print("Total size: ", questions_no_dups.__len__())
 
+    if questions_no_dups.index.size:
+        # First question is 1. Last question is 10 (there's no value for 10 because analytics events haven't been implemented for last question yet).
+        fig = px.bar(questions_no_dups.groupby('value').mean(), y = "time")
+        return fig, "Sample size: " + str(len(questions_no_dups.index))
+    else:
+        return dash.no_update, "Error: No events for date range"
 
 # Number of clicks for each card for each personal value category.
 # e.g. If a person whose top 3 personal values are security, benevolence, and hedonism, then their clicks
@@ -217,7 +247,6 @@ def kpi3_v3():
 
 # Cards clicked vs card order.
 def kpi1():
-    analytics_renamed = analytics[analytics['category'] == 'card']
     analytics_renamed = analytics.rename(columns={'value': 'effect_iri'})
 
     # Remove duplicate clicks from same session_uuid
@@ -242,7 +271,39 @@ def kpi2():
         clicks.plot.bar(ax=ax, subplots=True, ylabel="Card", title=pv, xlabel="Clicks")
 
 
-# Entrypoint here:
-# Just run any function kpi* and it will start matplotlib plots.
-kpi6()
-plt.show()
+def generate_slider_marks():
+    mark_nums = [14, 30, 60, 120, 180, 240, 300, 480]
+    mark_text = [str(x) + " days ago" for x in mark_nums]
+    return {-x: y for (x, y) in zip(mark_nums, mark_text)}
+
+
+app.layout = html.Div(children=[
+    html.H1(children='ClimateMind analytics'),
+
+    html.Div(
+        children=[
+            html.H2(children="KPI4 - Average reading time per question"),
+            dcc.Graph(
+                id='kpi4-graph'
+            ),
+            dcc.RangeSlider(
+                id='date-range-slider',
+                min=-500,
+                max=0,
+                step=10,
+                marks=generate_slider_marks(),
+                value=[-480, 0]
+            ),
+            html.H6(
+                children=["Sample size: ", 0],
+                id="sample-size-header"
+            )
+        ], style={
+            'width': '800px'
+        }, ),
+
+])
+
+if __name__ == '__main__':
+    app.run_server(debug=True, dev_tools_hot_reload=False)
+    # kpi4([-30, 0])
