@@ -32,8 +32,7 @@
 # fig.update_xaxes(dtick=1)
 # fig.write_html("images/fig.html")
 # fig1.write_html("images/fig1.html")
-
-
+import dash_table
 from matplotlib import pyplot as plt
 
 import pandas as pd
@@ -105,6 +104,109 @@ analytics_click_only = analytics[analytics['action'] == 'card_click']
 cards_clicked = scores_top3.merge(analytics_click_only, on="session_uuid", how='right')
 cards_shown = scores_top3.merge(analytics_click_only, on="session_uuid", how='right')
 
+
+
+# KPI 4 -- average question completion time
+# Calculated by taking the start time of the next question, subtracted the start time of previous question.
+@app.callback([
+    dash.dependencies.Output("kpi4-graph", "figure"),
+    dash.dependencies.Output("sample-size-header", "children"),
+
+    # Show the raw data as a table.
+    dash.dependencies.Output("pivot-questions-table", "data")],
+
+    [dash.dependencies.Input('date-range-slider', 'value')])
+def kpi4(value):
+    from datetime import datetime, timedelta
+    global prevfig
+
+    fromdate = datetime.now() - timedelta(days=-value[0])
+    todate = datetime.now() - timedelta(days=-value[1])
+
+    analytics["event_timestamp"] = pd.to_datetime(analytics["event_timestamp"])
+
+    date_filtered_analytics = analytics[
+        (analytics["event_timestamp"] >= fromdate) & (analytics["event_timestamp"] <= todate)]
+    temp = date_filtered_analytics[date_filtered_analytics['action'] == 'question_start'].sort_values(
+        ["event_timestamp", "value"], ascending=[True, False])
+
+    questions_no_dups = pd.DataFrame(columns=temp.columns)
+    for user_id, question_data in temp.groupby('session_uuid'):
+        questions_sorted = question_data.drop_duplicates(subset='value')
+
+        prevtime = questions_sorted.iloc[0, :]["event_timestamp"]
+        for index, row in questions_sorted.iterrows():
+            curtime = row["event_timestamp"]
+            questions_sorted.loc[index, "time"] = (curtime - prevtime).seconds
+            prevtime = curtime
+        questions_no_dups = questions_no_dups.append(questions_sorted)
+    questions_no_dups["value"] = questions_no_dups["value"].astype('float64')
+
+    # Reverse the order of questions (higher value = first in question order).
+    questions_no_dups["value"] = questions_no_dups["value"].map(lambda k: 10 - k)
+
+    print("Total size: ", questions_no_dups.__len__())
+
+    if questions_no_dups.index.size:
+        # First question is 1. Last question is 10 (there's no value for 10 because analytics events haven't been implemented for last question yet).
+        fig = px.bar(questions_no_dups.groupby('value').mean(), y="time", title="Question answer time in seconds")
+
+
+        # Pivot the table to show data by question order as columns.
+        datatable = questions_no_dups.pivot(columns="value", values="time", index="session_uuid").to_dict('records')
+        return fig, "Sample size: " + str(len(questions_no_dups.index)), datatable
+    else:
+        return dash.no_update, "Error: No events for date range"
+
+
+
+def generate_slider_marks():
+    mark_nums = [14, 30, 60, 120, 180, 240, 300, 480]
+    mark_text = [str(x) + " days ago" for x in mark_nums]
+    return {-x: y for (x, y) in zip(mark_nums, mark_text)}
+
+
+cols = ["0.0", "1.0", "2.0", "3.0", "4.0", "5.0", "6.0", "7.0", "8.0", "9.0", ]
+
+app.layout = html.Div(children=[
+    html.H1(children='ClimateMind analytics'),
+
+    html.Div(
+        children=[
+            html.H2(children="KPI4 - Average reading time per question"),
+            dcc.Graph(
+                id='kpi4-graph'
+            ),
+            dcc.RangeSlider(
+                id='date-range-slider',
+                min=-500,
+                max=0,
+                step=10,
+                marks=generate_slider_marks(),
+                value=[-480, 0]
+            ),
+            html.P(
+                children=["Sample size: ", 0],
+                id="sample-size-header"
+            ),
+            dash_table.DataTable(
+                id="pivot-questions-table",
+                columns=[{"name": i, "id": i} for i in cols]
+            )
+        ], style={
+            'max-width': '1000px'
+        }, ),
+
+])
+
+if __name__ == '__main__':
+    app.run_server(debug=True, dev_tools_hot_reload=False)
+    # kpi4([-30, 0])
+
+
+
+# Unused code, will be replaced when the new analytics table comes out.
+
 # Data for the cards that are clicked, grouped by the user's personal value category, and further by the card id being clicked ('value').
 grouped = cards_clicked.groupby(['pv', 'value'])  # cards that are clicked
 
@@ -168,142 +270,3 @@ def kpi6():
 
 
 prevfig = None
-
-# KPI 4 -- average question completion time
-# Calculated by taking the start time of the next question, subtracted the start time of previous question.
-@app.callback(
-    [dash.dependencies.Output("kpi4-graph", "figure"), dash.dependencies.Output("sample-size-header", "children")],
-    [dash.dependencies.Input('date-range-slider', 'value')])
-def kpi4(value):
-    from datetime import datetime, timedelta
-    global prevfig
-
-    fromdate = datetime.now() - timedelta(days=-value[0])
-    todate = datetime.now() - timedelta(days=-value[1])
-
-    analytics["event_timestamp"] = pd.to_datetime(analytics["event_timestamp"])
-
-    date_filtered_analytics = analytics[
-        (analytics["event_timestamp"] >= fromdate) & (analytics["event_timestamp"] <= todate)]
-    temp = date_filtered_analytics[date_filtered_analytics['category'] == 'questionnaire'].sort_values(
-        "event_timestamp")
-
-    questions_no_dups = pd.DataFrame(columns=temp.columns)
-    for user_id, question_data in temp.groupby('session_uuid'):
-        questions_sorted = question_data.drop_duplicates(subset='value')
-
-        prevtime = questions_sorted.iloc[0, :]["event_timestamp"]
-        for index, row in questions_sorted.iterrows():
-            curtime = row["event_timestamp"]
-            questions_sorted.loc[index, "time"] = (curtime - prevtime).seconds
-            prevtime = curtime
-        questions_no_dups = questions_no_dups.append(questions_sorted)
-    questions_no_dups["value"] = questions_no_dups["value"].astype('float64')
-
-    # Reverse the order of questions (higher value = first in question order).
-    questions_no_dups["value"] = questions_no_dups["value"].map(lambda k: 10 - k)
-
-    print("Total size: ", questions_no_dups.__len__())
-
-    if questions_no_dups.index.size:
-        # First question is 1. Last question is 10 (there's no value for 10 because analytics events haven't been implemented for last question yet).
-        fig = px.bar(questions_no_dups.groupby('value').mean(), y = "time")
-        return fig, "Sample size: " + str(len(questions_no_dups.index))
-    else:
-        return dash.no_update, "Error: No events for date range"
-
-# Number of clicks for each card for each personal value category.
-# e.g. If a person whose top 3 personal values are security, benevolence, and hedonism, then their clicks
-# for each card will be added to all three graphs
-def kpi3_v2():
-    pv_clicked = {}
-    pv_shown = {}
-    for a, b in grouped.size().groupby(level=0):
-        pv_clicked[a] = b[a].reset_index()
-
-        pv_clicked[a]["value"] = pv_clicked[a]["value"].map(iri_node_map)
-        pv_clicked[a].sort_values(ascending=False, by=0).plot.bar(x="value", y=0,
-                                                                  title='All clicks' if not a else a,
-                                                                  ylabel="num clicks")
-
-
-# KPI 3 -- Average number of cards clicked across all personal values.
-# Displayed as simple boxplot.
-def kpi3():
-    clicks_by_uuid = analytics[analytics['action'] == 'card_click'][['session_uuid', 'value']].groupby(
-        'session_uuid').count()
-
-    # Clicks must be smaller than 21 for it to be included. More than 21 clicks doesn't make sense.
-    clicks_by_uuid[clicks_by_uuid["value"] <= 21].boxplot(title="Cards clicked per user")
-
-
-# KPI 3 -- same as KPI 3, but one graph for each personal value.
-def kpi3_v3():
-    group_clicked = cards_clicked[['pv', 'session_uuid', 'analytics_id']].groupby(
-        ['pv', 'session_uuid']).count().groupby(level=0).mean()
-    group_clicked = group_clicked.rename(columns={'analytics_id': 'average number of clicks'})
-    group_clicked.plot.bar()
-
-
-# Cards clicked vs card order.
-def kpi1():
-    analytics_renamed = analytics.rename(columns={'value': 'effect_iri'})
-
-    # Remove duplicate clicks from same session_uuid
-    analytics_renamed = analytics_renamed.drop_duplicates(['session_uuid', 'effect_iri'])
-    clicks = cf.merge(analytics_renamed, how="left", on=["session_uuid", "effect_iri"])
-    clicksarray = [0] * 21
-    shownarray = [0] * 21
-
-    for _, row in clicks[['effect_position', 'analytics_id']].iterrows():
-        if not pd.isnull(row['analytics_id']):
-            clicksarray[int(row['effect_position']) - 1] += 1
-        shownarray[int(row['effect_position']) - 1] += 1
-    print(clicksarray, shownarray)
-    pd.Series(clicksarray).plot.bar(title="Cards clicked vs card order", ylabel="Number of clicks",
-                                    xlabel="Card order (0-indexed)")
-
-
-def kpi2():
-    for pv, clicks in grouped.count().groupby(level=0):
-        fig, ax = plt.subplots()
-        clicks = clicks['analytics_id'].droplevel(0).rename(index=iri_node_map).sort_values()
-        clicks.plot.bar(ax=ax, subplots=True, ylabel="Card", title=pv, xlabel="Clicks")
-
-
-def generate_slider_marks():
-    mark_nums = [14, 30, 60, 120, 180, 240, 300, 480]
-    mark_text = [str(x) + " days ago" for x in mark_nums]
-    return {-x: y for (x, y) in zip(mark_nums, mark_text)}
-
-
-app.layout = html.Div(children=[
-    html.H1(children='ClimateMind analytics'),
-
-    html.Div(
-        children=[
-            html.H2(children="KPI4 - Average reading time per question"),
-            dcc.Graph(
-                id='kpi4-graph'
-            ),
-            dcc.RangeSlider(
-                id='date-range-slider',
-                min=-500,
-                max=0,
-                step=10,
-                marks=generate_slider_marks(),
-                value=[-480, 0]
-            ),
-            html.H6(
-                children=["Sample size: ", 0],
-                id="sample-size-header"
-            )
-        ], style={
-            'width': '800px'
-        }, ),
-
-])
-
-if __name__ == '__main__':
-    app.run_server(debug=True, dev_tools_hot_reload=False)
-    # kpi4([-30, 0])
