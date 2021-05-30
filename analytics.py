@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, date
 import dash_table
 import pandas as pd
 
@@ -56,18 +56,27 @@ analytics_click_only = analytics[analytics['action'] == 'card_click']
     dash.dependencies.Output("sample-size-header", "children"),
 
     # Show the raw data as a table.
-    dash.dependencies.Output("pivot-questions-table", "data")],
+    dash.dependencies.Output("pivot-questions-table", "data"),
+    dash.dependencies.Output("dropoff-graph", "figure")],
 
-    [dash.dependencies.Input('date-range-slider', 'value')])
-def kpi4(value):
-    fromdate = datetime.now() - timedelta(days=-value[0])
-    todate = datetime.now() - timedelta(days=-value[1])
+    [
+        dash.dependencies.Input('date-picker-range', 'start_date'),
+        dash.dependencies.Input('date-picker-range', 'end_date')
+    ])
+def kpi4(sd, ed):
+    if not (sd and ed):
+        return dash.no_update, dash.no_update, dash.no_update
+    print(sd, ed)
+    fromdate = datetime.fromisoformat(sd)
+    todate = datetime.fromisoformat(ed)
 
     analytics["event_timestamp"] = pd.to_datetime(analytics["event_timestamp"])
 
     date_filtered_analytics = analytics[
         (analytics["event_timestamp"] >= fromdate) & (analytics["event_timestamp"] <= todate)]
-    temp = date_filtered_analytics[date_filtered_analytics['action'] == 'question_start'].sort_values(
+    questions_filter = date_filtered_analytics['action'] == 'question_start'
+    questions_filter = questions_filter | (date_filtered_analytics['action'] == 'question_loaded')
+    temp = date_filtered_analytics[questions_filter].sort_values(
         ["event_timestamp", "value"], ascending=[True, False])
 
     questions_no_dups = pd.DataFrame(columns=temp.columns)
@@ -93,7 +102,7 @@ def kpi4(value):
 
     if questions_final.index.size:
         # First question is 1. Last question is 10 (there's no value for 10 because analytics events haven't been implemented for last question yet).
-        fig = px.bar(questions_final.groupby('value').mean(), y="time", title="Question answer time in seconds")
+        fig = px.bar(questions_final.groupby('value').mean(), y="time")
 
         # Pivot the table to show data by question order as columns.
         # Since we have data like this,
@@ -103,10 +112,13 @@ def kpi4(value):
         #   1                                3s                  ...
         # When we pivot the table with `value` as columns, we'll get the response time for each question order.
         datatable = questions_final.pivot(columns="value", values="time", index="session_uuid") \
-            .reset_index().to_dict('records')
-        return fig, "Sample size: " + str(len(questions_final.index)), datatable
+            .reset_index()
+
+        dropoff = datatable.count()
+        dropoff_graph = px.bar(dropoff, title = "# of question completions vs question order (dropoff graph)")
+        return fig, "Sample size: " + str(len(questions_final.index)), datatable.to_dict('records'), dropoff_graph
     else:
-        return dash.no_update, "Error: No events for date range", dash.no_update
+        return dash.no_update, "Error: No events for date range", dash.no_update, dash.no_update
 
 
 def generate_slider_marks():
@@ -117,18 +129,24 @@ def generate_slider_marks():
 
 cols = ["1.0", "2.0", "3.0", "4.0", "5.0", "6.0", "7.0", "8.0", "9.0", ]
 cols = [{"name": f"Q.{i[0]}", "id": i} for i in cols]
-cols = [{"name": "Session ID", "id" : "session_uuid"}] + cols
+cols = [{"name": "Session ID", "id": "session_uuid"}] + cols
 
 data_table_layout = html.Div(children=[
     html.H2(
-        children="Question response time vs. question order for each session_uuid (in seconds). "
+        children="Question response time vs. question order for each session_uuid (in seconds)."
     ),
     dash_table.DataTable(
         id="pivot-questions-table",
-        columns = cols,
+        columns=cols,
         style_cell={
             'font-size': '1.2em'
         }
+    ),
+    html.H2(
+        children="# of question completions vs question order"
+    ),
+    dcc.Graph(
+        id="dropoff-graph"
     )
 ])
 
@@ -137,17 +155,14 @@ app.layout = html.Div(children=[
 
     html.Div(
         children=[
-            html.H2(children="KPI4 - Average reading time per question"),
+            html.H2(children="KPI4 - Average reading time per question in seconds"),
             dcc.Graph(
                 id='kpi4-graph'
             ),
-            dcc.RangeSlider(
-                id='date-range-slider',
-                min=-500,
-                max=0,
-                step=10,
-                marks=generate_slider_marks(),
-                value=[-480, 0]
+            dcc.DatePickerRange(
+                id='date-picker-range',
+                start_date=date(2018, 1, 1),
+                end_date=datetime.now()
             ),
             html.P(
                 children=["Sample size: ", 0],
