@@ -1,40 +1,5 @@
-# import plotly.graph_objects as go
-# import plotly.express as px
-# import pyodbc
-# import pickle
-# from sql_queries import *
-
-# iri_node_name_map = pickle.load(open('iri_node_name_map.pickle', 'rb'))
-# db_params = os.environ.get("DATABASE_PARAMS", "place holder param. none found")
-#
-# # # cursor = conn.cursor()
-#
-# CLICKS_BY_CARD_ORDER = execute_sql_with_caching(CLICKS_BY_CARD_ORDER_QUERY, db_params)
-#
-# CARDS_SHOWN_VS_CARDS_CLICKED = execute_sql_with_caching(CARDS_SHOWN_VS_CARDS_CLICKED_QUERY, db_params)
-# CARDS_SHOWN_VS_CARDS_CLICKED.loc[:, "all_cards_iri"].replace(iri_node_name_map, inplace=True)
-#
-# fig = go.Figure()
-# fig.add_trace(go.Bar(
-#     x=CLICKS_BY_CARD_ORDER.loc[:, "effect_position"].to_list(),
-#     y=CLICKS_BY_CARD_ORDER.loc[:, "num_clicks"].to_list()
-# ))
-#
-# fig.update_layout(
-#     title="Card clicks vs card order in feed"
-# )
-# fig1 = px.bar(
-#     CARDS_SHOWN_VS_CARDS_CLICKED,
-#     x="all_cards_iri",
-#     y=["cards_clicked", "cards_shown"],
-#     title="cards clicked/cards shown for different cards"
-# )
-# fig.update_xaxes(dtick=1)
-# fig.write_html("images/fig.html")
-# fig1.write_html("images/fig1.html")
+from datetime import datetime, timedelta
 import dash_table
-from matplotlib import pyplot as plt
-
 import pandas as pd
 
 pd.options.plotting.backend = "plotly"
@@ -53,19 +18,22 @@ import dash_html_components as html
 
 app = dash.Dash(__name__)
 
+# Where are the pickle files located relative to this file location?
 pickle_files_root_dir = 'data'
+
+# Load the three main tables we'll require to pandas Dataframes.
 scores = pd.read_csv(pickle_files_root_dir + '/scores.csv')  # Scores table
 cf = pd.read_csv(pickle_files_root_dir + '/climate_feed.csv')  # Climate feed table
 analytics = pd.read_csv(pickle_files_root_dir + '/analytics_data.csv')  # analytics table
 
-# Dictionary mapping IRI to human-readable names.
+# Dictionary mapping IRI (some random base 64 string) to descriptive names.
 iri_node_map = pickle.load(open(pickle_files_root_dir + '/iri_node_name_map.pickle', 'rb'))
 
-# Sets up the needed auxiliary dataframes.
 personal_value_names = ["security", "conformity", "benevolence", "tradition", "universalism", "self_direction",
                         "stimulation", "hedonism", "achievement", "power"]
 
 
+# Caching function so we don't have to compute dataframes everytime we reload the script.
 def cache(name, value=None):
     if value is None:
         if os.path.exists("/tmp/" + name):
@@ -77,37 +45,12 @@ def cache(name, value=None):
         return value
 
 
-def setup_top_3(scores):
-    cache_ = cache(setup_top_3.__name__)
-    if cache_ is not None:
-        return cache_
-
-    scores_top3 = pd.DataFrame()
-    prev_row = list(scores.iterrows())
-    for row, _ in prev_row:
-        top_3 = scores.loc[row, [*personal_value_names]].astype('float64').nlargest(3).index
-        if (top_3.isnull().sum()):
-            print(top_3)
-
-        temp = pd.concat([scores[["session_uuid", "user_uuid"]].loc[row]] * 3, axis=1, ignore_index=True).T
-        temp.loc[0, "pv"] = top_3[0]
-        temp.loc[1, "pv"] = top_3[1]
-        temp.loc[2, "pv"] = top_3[2]
-        scores_top3 = scores_top3.append(temp, ignore_index=True)
-    return cache(setup_top_3.__name__, scores_top3)
-
-
-# scores_top3 is similar to scores, except it contains triple the amount of rows.
-# each row represents a user, so I clone that row three times.
-scores_top3 = setup_top_3(scores)
 analytics_click_only = analytics[analytics['action'] == 'card_click']
-cards_clicked = scores_top3.merge(analytics_click_only, on="session_uuid", how='right')
-cards_shown = scores_top3.merge(analytics_click_only, on="session_uuid", how='right')
-
 
 
 # KPI 4 -- average question completion time
 # Calculated by taking the start time of the next question, subtracted the start time of previous question.
+# Outputs the question response time bar chart, the sample size heading, and the raw data table.
 @app.callback([
     dash.dependencies.Output("kpi4-graph", "figure"),
     dash.dependencies.Output("sample-size-header", "children"),
@@ -117,9 +60,6 @@ cards_shown = scores_top3.merge(analytics_click_only, on="session_uuid", how='ri
 
     [dash.dependencies.Input('date-range-slider', 'value')])
 def kpi4(value):
-    from datetime import datetime, timedelta
-    global prevfig
-
     fromdate = datetime.now() - timedelta(days=-value[0])
     todate = datetime.now() - timedelta(days=-value[1])
 
@@ -145,19 +85,28 @@ def kpi4(value):
     # Reverse the order of questions (higher value = first in question order).
     questions_no_dups["value"] = questions_no_dups["value"].map(lambda k: 10 - k)
 
-    print("Total size: ", questions_no_dups.__len__())
+    # Delete all rows where question `value` is 0 and 10, since we can't get the time for the last question,
+    # and `value` = 0 is just a byproduct of the processing script.
+    questions_final = questions_no_dups[questions_no_dups["value"] >= 1]
 
-    if questions_no_dups.index.size:
+    print("Total size: ", questions_final.__len__())
+
+    if questions_final.index.size:
         # First question is 1. Last question is 10 (there's no value for 10 because analytics events haven't been implemented for last question yet).
-        fig = px.bar(questions_no_dups.groupby('value').mean(), y="time", title="Question answer time in seconds")
-
+        fig = px.bar(questions_final.groupby('value').mean(), y="time", title="Question answer time in seconds")
 
         # Pivot the table to show data by question order as columns.
-        datatable = questions_no_dups.pivot(columns="value", values="time", index="session_uuid").to_dict('records')
-        return fig, "Sample size: " + str(len(questions_no_dups.index)), datatable
+        # Since we have data like this,
+        # value (question number)     |     response time    |   ...
+        #   3                                1s                  ...
+        #   2                                5s                  ...
+        #   1                                3s                  ...
+        # When we pivot the table with `value` as columns, we'll get the response time for each question order.
+        datatable = questions_final.pivot(columns="value", values="time", index="session_uuid") \
+            .reset_index().to_dict('records')
+        return fig, "Sample size: " + str(len(questions_final.index)), datatable
     else:
-        return dash.no_update, "Error: No events for date range"
-
+        return dash.no_update, "Error: No events for date range", dash.no_update
 
 
 def generate_slider_marks():
@@ -166,7 +115,22 @@ def generate_slider_marks():
     return {-x: y for (x, y) in zip(mark_nums, mark_text)}
 
 
-cols = ["0.0", "1.0", "2.0", "3.0", "4.0", "5.0", "6.0", "7.0", "8.0", "9.0", ]
+cols = ["1.0", "2.0", "3.0", "4.0", "5.0", "6.0", "7.0", "8.0", "9.0", ]
+cols = [{"name": f"Q.{i[0]}", "id": i} for i in cols]
+cols = [{"name": "Session ID", "id" : "session_uuid"}] + cols
+
+data_table_layout = html.Div(children=[
+    html.H2(
+        children="Question response time vs. question order for each session_uuid (in seconds). "
+    ),
+    dash_table.DataTable(
+        id="pivot-questions-table",
+        columns = cols,
+        style_cell={
+            'font-size': '1.2em'
+        }
+    )
+])
 
 app.layout = html.Div(children=[
     html.H1(children='ClimateMind analytics'),
@@ -189,10 +153,8 @@ app.layout = html.Div(children=[
                 children=["Sample size: ", 0],
                 id="sample-size-header"
             ),
-            dash_table.DataTable(
-                id="pivot-questions-table",
-                columns=[{"name": i, "id": i} for i in cols]
-            )
+            html.Hr(),
+            data_table_layout
         ], style={
             'max-width': '1000px'
         }, ),
@@ -202,71 +164,3 @@ app.layout = html.Div(children=[
 if __name__ == '__main__':
     app.run_server(debug=True, dev_tools_hot_reload=False)
     # kpi4([-30, 0])
-
-
-
-# Unused code, will be replaced when the new analytics table comes out.
-
-# Data for the cards that are clicked, grouped by the user's personal value category, and further by the card id being clicked ('value').
-grouped = cards_clicked.groupby(['pv', 'value'])  # cards that are clicked
-
-# same as grouped, but data includes all cards shown to the user., instead of cards clicked.
-grouped_shown = cards_shown.groupby(['pv', 'value'])
-
-cards_opened_not_closed = []
-
-
-# KPI 5
-# Average time reading a card by card (filter out cards that don’t have a corresponding close event)
-def kpi5():
-    from collections import defaultdict
-    from datetime import datetime
-    def default_series():
-        return pd.Series(index=[0])
-
-    card_read_times = defaultdict(default_series)  # Key: card value, Value: read times
-    for k, v in analytics[analytics['action'] == 'card_click'].groupby('session_uuid'):
-        v['event_timestamp'] = v['event_timestamp'].map(lambda a: datetime.fromisoformat(a))
-        v = v.sort_values(['value', 'event_timestamp'])
-
-        # Stores when a particular card was opened.
-        # Keyed by card value, stores information about a particular open event.
-        # When we find a close event, match it with the open event, calculate the time in between,
-        # and delete the open event.
-        open_time = dict()
-
-        for index, row in v.iterrows():
-            if row["value"] not in open_time:
-                open_time[row["value"]] = row
-            else:
-                card_read_times[row["value"]][index] = row["event_timestamp"] - open_time[row["value"]][
-                    "event_timestamp"]
-
-                # Have found a close event. Delete that value from open_time
-                del open_time[row["value"]]
-
-        # Search for what cards were opened and not closed for KPI 6
-        # If all cards opened are closed, then open_time dict should be empty.
-        cards_opened_not_closed.extend(open_time.values())
-    for k, v in card_read_times.items():
-        # Take the median, get seconds.
-        card_read_times[k] = v.quantile(0.5).seconds
-
-        if (v.size < 5):
-            print(f"Warning: only {v.size} people read {iri_node_map[k]}")
-    readtime = pd.Series(card_read_times).sort_values().reset_index()
-    readtime['Card Name'] = readtime['index'].map(iri_node_map)
-    readtime['Median read time in seconds'] = readtime[0]
-    readtime.plot.barh(y='Median read time in seconds', x="Card Name", figsize=(10, 10))
-
-
-def kpi6():
-    cards_opened_not_closed.clear()
-    kpi5()
-    df = pd.DataFrame(cards_opened_not_closed)['value'].value_counts().reset_index()
-    df['Card Names'] = df['index'].map(iri_node_map)
-    df["Number of drop offs"] = df["value"]
-    df.plot.barh(y="Number of drop offs", x="Card Names", figsize=(10, 10), title="Number of drop offs for each card")
-
-
-prevfig = None
