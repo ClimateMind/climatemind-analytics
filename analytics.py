@@ -51,6 +51,8 @@ analytics_click_only = analytics[analytics['action'] == 'card_click']
 # KPI 4 -- average question completion time
 # Calculated by taking the start time of the next question, subtracted the start time of previous question.
 # Outputs the question response time bar chart, the sample size heading, and the raw data table.
+# sd: start_date (ISO format)
+# ed: end_date
 @app.callback([
     dash.dependencies.Output("kpi4-graph", "figure"),
     dash.dependencies.Output("sample-size-header", "children"),
@@ -66,7 +68,6 @@ analytics_click_only = analytics[analytics['action'] == 'card_click']
 def kpi4(sd, ed):
     if not (sd and ed):
         return dash.no_update, dash.no_update, dash.no_update
-    print(sd, ed)
     fromdate = datetime.fromisoformat(sd)
     todate = datetime.fromisoformat(ed)
 
@@ -102,7 +103,10 @@ def kpi4(sd, ed):
 
     if questions_final.index.size:
         # First question is 1. Last question is 10 (there's no value for 10 because analytics events haven't been implemented for last question yet).
+
         fig = px.bar(questions_final.groupby('value').mean(), y="time")
+        fig.update_yaxes(title = {'text': "Time to answer question in seconds"})
+        fig.update_xaxes(title = {'text': "Question order"})
 
         # Pivot the table to show data by question order as columns.
         # Since we have data like this,
@@ -115,7 +119,9 @@ def kpi4(sd, ed):
             .reset_index()
 
         dropoff = datatable.count()
-        dropoff_graph = px.bar(dropoff, title = "# of question completions vs question order (dropoff graph)")
+        dropoff_graph = px.bar(dropoff, title = "# of question completions vs question order (dropoff graph)", y = 0)
+        dropoff_graph.update_yaxes(title={'text': "Number of people answering"})
+        dropoff_graph.update_xaxes(title={'text': "Question order"})
         return fig, "Sample size: " + str(len(questions_final.index)), datatable.to_dict('records'), dropoff_graph
     else:
         return dash.no_update, "Error: No events for date range", dash.no_update, dash.no_update
@@ -155,14 +161,15 @@ app.layout = html.Div(children=[
 
     html.Div(
         children=[
-            html.H2(children="KPI4 - Average reading time per question in seconds"),
+            html.H2(children="KPI4 - Average reading time per question"),
             dcc.Graph(
                 id='kpi4-graph'
             ),
             dcc.DatePickerRange(
                 id='date-picker-range',
                 start_date=date(2018, 1, 1),
-                end_date=datetime.now()
+                end_date=datetime.now(),
+                initial_visible_month=datetime.now()
             ),
             html.P(
                 children=["Sample size: ", 0],
