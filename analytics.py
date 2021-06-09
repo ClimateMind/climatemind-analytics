@@ -4,9 +4,9 @@ import pandas as pd
 
 pd.options.plotting.backend = "plotly"
 import pickle
-import os
 import plotly.express as px
-
+import pyodbc
+import os
 # Makes plots look nicer.
 from matplotlib import rcParams
 
@@ -22,9 +22,15 @@ app = dash.Dash(__name__)
 pickle_files_root_dir = 'data'
 
 # Load the three main tables we'll require to pandas Dataframes.
-scores = pd.read_csv(pickle_files_root_dir + '/scores.csv')  # Scores table
-cf = pd.read_csv(pickle_files_root_dir + '/climate_feed.csv')  # Climate feed table
-analytics = pd.read_csv(pickle_files_root_dir + '/analytics_data.csv')  # analytics table
+# scores = pd.read_csv(pickle_files_root_dir + '/scores.csv')  # Scores table
+# cf = pd.read_csv(pickle_files_root_dir + '/climate_feed.csv')  # Climate feed table
+# analytics = pd.read_csv(pickle_files_root_dir + '/analytics_data.csv')  # analytics table
+
+sqlconn = pyodbc.connect(os.environ["DATABASE_PARAMS"])
+
+analytics = pd.read_sql("SELECT * FROM analytics_data", sqlconn)
+cf = pd.read_sql("SELECT * FROM climate_feed", sqlconn)
+scores = pd.read_sql("SELECT * FROM scores", sqlconn)
 
 # Dictionary mapping IRI (some random base 64 string) to descriptive names.
 iri_node_map = pickle.load(open(pickle_files_root_dir + '/iri_node_name_map.pickle', 'rb'))
@@ -176,7 +182,11 @@ app.layout = html.Div(children=[
                 id="sample-size-header"
             ),
             html.Hr(),
-            data_table_layout
+            data_table_layout,
+
+            html.H3(
+                children = "Data pulled as of now."
+            )
         ], style={
             'max-width': '1000px'
         }, ),
