@@ -111,8 +111,8 @@ def kpi4(sd, ed):
         # First question is 1. Last question is 10 (there's no value for 10 because analytics events haven't been implemented for last question yet).
 
         fig = px.bar(questions_final.groupby('value').mean(), y="time")
-        fig.update_yaxes(title = {'text': "Time to answer question in seconds"})
-        fig.update_xaxes(title = {'text': "Question order"})
+        fig.update_yaxes(title={'text': "Time to answer question in seconds"})
+        fig.update_xaxes(title={'text': "Question order"})
 
         # Pivot the table to show data by question order as columns.
         # Since we have data like this,
@@ -125,7 +125,7 @@ def kpi4(sd, ed):
             .reset_index()
 
         dropoff = datatable.count()
-        dropoff_graph = px.bar(dropoff, title = "# of question completions vs question order (dropoff graph)", y = 0)
+        dropoff_graph = px.bar(dropoff, title="# of question completions vs question order (dropoff graph)", y=0)
         dropoff_graph.update_yaxes(title={'text': "Number of people answering"})
         dropoff_graph.update_xaxes(title={'text': "Question order"})
         return fig, "Sample size: " + str(len(questions_final.index)), datatable.to_dict('records'), dropoff_graph
@@ -185,7 +185,7 @@ app.layout = html.Div(children=[
             data_table_layout,
 
             html.H3(
-                children = "Data pulled as of now."
+                children=f"Latest event: {analytics.iloc[-1].event_timestamp}"
             )
         ], style={
             'max-width': '1000px'
