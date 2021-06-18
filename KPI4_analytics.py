@@ -3,10 +3,13 @@ import numpy as np
 import seaborn as sns
 sns.set_theme(style="whitegrid")
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly.express as px
+import os
 import warnings
 warnings.filterwarnings('ignore')
 
-csv_file_path = 'Path to the directory where csv dataset is saved/page_by_session90-2.csv'
+csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
 
 
 def load_data(csv_file_path, targeted_action = 'question_loaded'):
@@ -27,12 +30,12 @@ def load_data(csv_file_path, targeted_action = 'question_loaded'):
   
 
 #To just check whether the above function is working or not  	
-#df = load_data(csv_file_path, targeted_action = 'question_loaded')
+df = load_data(csv_file_path, targeted_action = 'question_loaded')
 
 
 
 
-def compute_time_differences(df):
+def compute_time_differences(df, session_id, timestamp, difference_column):
     """
 	Computes the difference in seconds of consecutive timepoints in the data, grouped by session_id.
 
@@ -52,24 +55,24 @@ def compute_time_differences(df):
   """
 
     
-    df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+    df[timestamp] = pd.to_datetime(df[timestamp])
     
-    sorted_df = df.sort_values(by = ['Questionnaire_Session_ID', 'Timestamp'], ascending=True)
+    sorted_df = df.sort_values(by = [session_id, timestamp], ascending=True)
     
-    df['Lag_Timestamp'] = sorted_df.groupby(['Questionnaire_Session_ID'])['Timestamp'].shift(1)
+    df['Lag_Timestamp'] = sorted_df.groupby([session_id])[timestamp].shift(1)
     
-    df['Interval'] = df['Timestamp'] - df['Lag_Timestamp']
+    df['Interval'] = df[timestamp] - df['Lag_Timestamp']
     
-    df['Secs'] = df['Interval'].dt.components['seconds']
+    df[difference_column] = df['Interval'].dt.components['seconds']
     
     return df
 
 #To check whether function is working or not
-#df2 = compute_time_differences(df)
+df2 = compute_time_differences(df, 'Questionnaire_Session_ID', 'Timestamp', 'Secs')
   	
 	
   	
-def aggregate_questions_revisited(df2):
+def aggregate_questions_revisited(df2, session_id, value_column, difference_column):
   """
  	Combines the time taken on questions that were revisted multiple times by the user.
 
@@ -87,17 +90,17 @@ def aggregate_questions_revisited(df2):
     
   """
   
-  time = df2.groupby(['Questionnaire_Session_ID', 'Value'], sort = False)['Secs'].sum()
+  time = df2.groupby([session_id, value_column], sort = False)[difference_column].sum()
   time_df = pd.DataFrame(time)
   time_df.reset_index(inplace = True)
-  time_df = time_df.loc[time_df['Value'] < 20]
+  time_df = time_df.loc[time_df[value_column] < 20]
   return time_df
 
-#time_df = aggregate_questions_revisited(df2)
+time_df = aggregate_questions_revisited(df2, 'Questionnaire_Session_ID', 'Value', 'Secs')
 #time_df['Value'].unique()
   
 
-def remove_abnormal_use_data(time_df):
+def remove_abnormal_use_data(time_df, session_id, difference_column, filter_threshold):
   """
   	Removes all questionnaire data associated with any user that takes less than 2 seconds.
       
@@ -114,15 +117,15 @@ def remove_abnormal_use_data(time_df):
 
   """
   
-  time_filter = time_df.groupby(['Questionnaire_Session_ID'], sort = False).min('Secs').reset_index()
-  time_filter['filter_pass'] = time_filter['Secs'] > 2
-  time_df_with_filter = time_df.merge(time_filter[['Questionnaire_Session_ID','filter_pass']], on = 'Questionnaire_Session_ID')
+  time_filter = time_df.groupby([session_id], sort = False).min(difference_column).reset_index()
+  time_filter['filter_pass'] = time_filter[difference_column] > filter_threshold
+  time_df_with_filter = time_df.merge(time_filter[[session_id, 'filter_pass']], on = session_id)
   time_df_filtered = time_df_with_filter[time_df_with_filter.filter_pass == True] 
 
   return time_df_filtered
 
 #To check whether the above function is working or not
-#time_df_filtered = remove_abnormal_use_data(time_df)
+time_df_filtered = remove_abnormal_use_data(time_df, 'Questionnaire_Session_ID', 'Secs', 2)
   
 #OPTION 2 for filtering
   #minimums = time_df.groupby(['Questionnaire_Session_ID'], sort = False)['Secs'].min() > 2.0
@@ -131,7 +134,7 @@ def remove_abnormal_use_data(time_df):
 
 
 
-def drop_off(time_df_filtered, groupby_column):
+def drop_off(time_df_filtered, session_id, groupby_column):
   """
 	Computes the drop_off % of each value in the df. 
 
@@ -152,15 +155,18 @@ def drop_off(time_df_filtered, groupby_column):
 
   """
   time_df2= pd.DataFrame()
-  time_df2['Unique_Users'] = time_df_filtered.groupby([groupby_column])['Questionnaire_Session_ID'].nunique()
+  time_df2['Unique_Users'] = time_df_filtered.groupby([groupby_column])[session_id].nunique()
   time_df2.sort_values(by = [groupby_column], ascending = False, inplace = True)
   time_df2['User Interval'] = time_df2['Unique_Users']/ time_df2['Unique_Users'].max()
   time_df2.reset_index(inplace = True)
+  time_df2['User Interval %'] = (time_df2['User Interval'] * 100)
+  
+  print("The number of Unique Users are  = ",time_df2['Unique_Users'].max())
 
   return time_df2
 
 #To check whether the above function is working or not
-#time_df2 = drop_off(time_df_filtered, 'Value')
+time_df2 = drop_off(time_df_filtered, 'Questionnaire_Session_ID', 'Value')
 
 
 
@@ -209,7 +215,7 @@ def swarm_plot(time_df_filtered, x_column, y_column, x_axis_label, y_axis_label,
 
 
 #To check whether the above function is working or not
-#sp = swarm_plot(time_df_filtered, 'Value', 'Secs', 'Question_ID','Total time taken (Seconds)', 'Total time taken to answer each question')
+sp = swarm_plot(time_df_filtered, 'Value', 'Secs', 'Question_ID','Total time taken (Seconds)', 'Total time taken to answer each question', 'Swarm Plot.png')
 
 
 
@@ -245,6 +251,8 @@ def dropoff_plot(time_df2, x_column, y_column, x_axis_label, y_axis_label, graph
     
     ax.set(xlabel = x_axis_label, ylabel = y_axis_label, title = graph_title)
     
+    
+    
     ax.invert_xaxis()
     
     ax.figure.savefig(image_name)
@@ -253,10 +261,120 @@ def dropoff_plot(time_df2, x_column, y_column, x_axis_label, y_axis_label, graph
 
 
 #To check whether the above function is working or not
-#dop = dropoff_plot(time_df2, 'Value', 'User Interval')
+dop = dropoff_plot(time_df2, 'Value', 'User Interval %','Question_ID','User Interval %', 'User Drop-off Graph','Line Plot.png')
 
       
-  
+
+
+
+"""PLOTLY FUNCTIONS"""
+
+def plotly_lineplot(time_df2, x_column, y_column, x_axis_label, y_axis_label, graph_title, image_name):
+    
+    """
+    input:
+    time_df2 = pandas dataframe containing the data to plot
+	x_column = x axis data for the plot
+	y_column = y axis data for the plot
+	x_axis_label = label for the x-axis on the plot
+	y_axis_label = label for the y-axis on the plot
+	graph_title = title for the plot
+    image_name = Name for image to be saved
+
+	output:
+	labeled Plotly Line Plot object 
+    
+    1 - Creates a Plot using assigned dataframe and X and Y axes
+    2 - Updates the X-axis to show all questions
+    3 - Reverses the range for questions from 10 to 1
+    4 - Adds axes labels, title, and modifies font and dimensions
+    5 - Displays the Line Plot
+    6 , 7 - If 'images' folder does not exist in your default directory, it assigns "images" folder
+    8 - Saves the plot to "images" folder with the assigned name 
+    
+    """
+    
+    fig = go.Figure(data = go.Scatter(x = time_df2[x_column], y = time_df2[y_column]))
+    
+    fig.update_xaxes(range = [1 , 11], dtick = 1)
+
+    fig['layout']['xaxis']['autorange'] = "reversed"
+    
+    fig.update_yaxes(rangemode = 'tozero')
+    
+    fig.update_layout(title = graph_title,
+                      xaxis_title = x_axis_label,
+                      yaxis_title = y_axis_label,
+                      yaxis_tickformat = '%',
+                      autosize = False,
+                      width = 1000,
+                      height = 1000,
+                      font=dict(family="Courier New, monospace",
+                                size=18,
+                                color="RebeccaPurple"))
+    
+
+    fig.show()
+    
+    if not os.path.exists("images"):
+        os.mkdir("images")
+    fig.write_image("images/{}".format(image_name))
+
+
+    
+    
+plotly_lineplot(time_df2, 'Value', 'User Interval', 'Question_ID', 'User Interval %','User Drop-off Graph', 'Drop-off Grap2.png')
+
+
+def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis_label, graph_title, image_name):
+    """
+    input:
+    time_df2 = pandas dataframe containing the data to plot
+	x_column = x axis data for the plot
+	y_column = y axis data for the plot
+	x_axis_label = label for the x-axis on the plot
+	y_axis_label = label for the y-axis on the plot
+	graph_title = title for the plot
+    image_name = Name for image to be saved
+
+	output:
+	labeled Plotly Line Plot object 
+    
+    1 - Creates a Violin Plot with assigned dataframe and columns
+    2 - Updates X axis range to show all questions
+    3 - Reverses the question order to display 10 to 1
+    4 - Adds the assigned title, labels, and changes dimensions
+    5 - Shows the resultant image
+    6 , 7 - If 'images' folder does not exist in your default directory, it assigns "images" folder
+    8 - Saves the plot to "images" folder with the assigned name
+    
+    """
+    
+    fig = px.violin(time_df_filtered, x = time_df_filtered[x_column], y = time_df_filtered[y_column], box = True, points = 'all', color = time_df_filtered[x_column])
+    
+    fig.update_xaxes(range = [1 , 11], dtick = 1)
+    
+    fig['layout']['xaxis']['autorange'] = "reversed"
+    
+    fig.update_layout(title = graph_title,
+                      xaxis_title = x_axis_label,
+                      yaxis_title = y_axis_label,
+                      autosize = False,
+                      width = 1500,
+                      height = 1500,
+                      font=dict(family="Courier New, monospace",
+                                size=18,
+                                color="RebeccaPurple"))
+    
+    fig.show()
+    
+    if not os.path.exists("images"):
+        os.mkdir("images")
+    fig.write_image("images/{}".format(image_name))
+
+
+plotly_violinplot(time_df_filtered, 'Value', 'Secs', 'Question_ID', 'Time taken (Seconds)', 'Total time taken for each question', 'Violin.png')
+
 
 
 
@@ -274,18 +392,20 @@ def KPI4_analysis(csv_file_path):
    5 - Uses cleaned_data to get User Drop-off % for each Value (Question_ID) and stores in drop_off_data
    6 - Creates a Swarm plot using cleaned_data and other plotting parameters
    7 - Creates a Line plot using drop_off_data and other plotting parameters
+   8 - Creates a Violin plot using cleaned_data and other plotting parameters
+   7 - Creates a Line plot using drop_off_data and other plotting parameters
    
  """
     
     data = load_data(csv_file_path, 'question_loaded')
     
-    time_differences = compute_time_differences(data)
+    time_differences = compute_time_differences(data, 'Questionnaire_Session_ID', 'Timestamp', 'Secs')
     
-    revisits_summed = aggregate_questions_revisited(time_differences)
+    revisits_summed = aggregate_questions_revisited(time_differences, 'Questionnaire_Session_ID', 'Value', 'Secs')
     
-    cleaned_data = remove_abnormal_use_data(revisits_summed)
+    cleaned_data = remove_abnormal_use_data(revisits_summed, 'Questionnaire_Session_ID', 'Secs', 2)
     
-    drop_off_data = drop_off(cleaned_data, 'Value')
+    drop_off_data = drop_off(cleaned_data, 'Questionnaire_Session_ID', 'Value')
     
     swarm_plot_graph = swarm_plot(cleaned_data, 'Value', 'Secs', 'Question_ID',
                                   'Time taken to answer (Seconds)', 'Total time taken to answer each question',
@@ -294,6 +414,14 @@ def KPI4_analysis(csv_file_path):
     dropoff_plot_graph = dropoff_plot(drop_off_data, 'Value', 'User Interval',
                                       'Question_ID','User Interval %', 'User Drop-off Graph',
                                       'Line Plot.png')
+    
+    violin_plot = plotly_violinplot(cleaned_data, 'Value', 'Secs', 'Question_ID',
+                                     'Time taken to answer (Seconds)', 'Total time taken to answer each question',
+                                     'Violin Plot.png')
+    
+    line_plot = plotly_lineplot(drop_off_data,'Value', 'User Interval',
+                                'Question_ID','User Interval %', 'User Drop-off Graph',
+                                'Plotly Line Plot.png')
 
 
 	
