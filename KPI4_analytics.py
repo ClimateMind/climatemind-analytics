@@ -1,3 +1,5 @@
+from datetime import datetime, date
+
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -9,6 +11,12 @@ import plotly.express as px
 import os
 import warnings
 import pyodbc
+
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+
+app = dash.Dash(__name__)
 
 
 warnings.filterwarnings('ignore')
@@ -33,6 +41,7 @@ csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
 #     return ql_analytics
 
 def load_data(_, targeted_action = 'question_loaded'):
+    global analytics
     sqlconn = pyodbc.connect(os.environ["DATABASE_PARAMS"])
 
     analytics = pd.read_sql("SELECT * FROM analytics_data", sqlconn)
@@ -42,6 +51,10 @@ def load_data(_, targeted_action = 'question_loaded'):
 def parse_columns_native_formats(df):
     df['value'] = pd.to_numeric(df['value'])
     df['event_timestamp'] = pd.to_datetime(df['event_timestamp'])
+
+analytics = load_data(csv_file_path, 'question_loaded')
+
+parse_columns_native_formats(analytics)
 
 def compute_time_differences(df, session_id, timestamp, difference_column):
     """
@@ -351,7 +364,7 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
 
 
 
-def KPI4_analysis(csv_file_path):
+def KPI4_analysis(data):
     """
    Runs all the analytics functions.
 
@@ -370,9 +383,7 @@ def KPI4_analysis(csv_file_path):
    
  """
 
-    data = load_data(csv_file_path, 'question_loaded')
 
-    parse_columns_native_formats(data)
 
     time_differences = compute_time_differences(data, 'session_uuid', 'event_timestamp', 'Secs')
 
@@ -398,13 +409,87 @@ def KPI4_analysis(csv_file_path):
                                 'Question_ID', 'User Interval %', 'User Drop-off Graph',
                                 'Plotly Line Plot.png')
 
-    violin_plot.show()
-    line_plot.show()
+    # violin_plot.show()
+    # line_plot.show()
+    return violin_plot, line_plot
 
+
+
+
+
+@app.callback([
+    dash.dependencies.Output("kpi4-graph", "figure"),
+    dash.dependencies.Output("sample-size-header", "children"),
+
+    # Show the raw data as a table.
+    dash.dependencies.Output("dropoff-graph", "figure")],
+
+    [
+        dash.dependencies.Input('date-picker-range', 'start_date'),
+        dash.dependencies.Input('date-picker-range', 'end_date')
+    ])
+def kpi4(sd, ed):
+    if not (sd and ed):
+        return dash.no_update, dash.no_update, dash.no_update
+    fromdate = datetime.fromisoformat(sd)
+    todate = datetime.fromisoformat(ed)
+
+    date_filtered_analytics = analytics[
+        (analytics["event_timestamp"] >= fromdate) & (analytics["event_timestamp"] <= todate)]
+
+    # analytics["event_timestamp"] = pd.to_datetime(analytics["event_timestamp"])
+
+    violin, line = KPI4_analysis(date_filtered_analytics)
+    return violin, "", line
 
 """
 Once everything above is executed, use the below function to get the plots saved to your system
 
 """
 
-KPI4_analysis(csv_file_path)
+
+data_table_layout = html.Div(children=[
+    html.H2(
+        children="Question response time vs. question order for each session_uuid (in seconds)."
+    ),
+    html.H2(
+        children="# of question completions vs question order"
+    ),
+    dcc.Graph(
+        id="dropoff-graph"
+    )
+])
+
+app.layout = html.Div(children=[
+    html.H1(children='ClimateMind analytics'),
+
+    html.Div(
+        children=[
+            html.H2(children="KPI4 - Average reading time per question"),
+            dcc.Graph(
+                id='kpi4-graph'
+            ),
+            dcc.DatePickerRange(
+                id='date-picker-range',
+                start_date=date(2018, 1, 1),
+                end_date=datetime.now(),
+                initial_visible_month=datetime.now()
+            ),
+            html.P(
+                children=["Sample size: ", 0],
+                id="sample-size-header"
+            ),
+            html.Hr(),
+            data_table_layout,
+
+            html.H3(
+                children=f"Latest event: {analytics.iloc[-1].event_timestamp}"
+            )
+        ], style={
+            'max-width': '1000px'
+        }, ),
+
+])
+
+if __name__ == '__main__':
+    app.run_server(debug=True, dev_tools_hot_reload=False)
