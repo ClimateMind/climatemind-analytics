@@ -440,7 +440,6 @@ def run_dash_app():
     """
     app = dash.Dash(__name__)
 
-    data_table_layout =
 
     # Defines how the website will look and the positioning of the elements.
     app.layout = html.Div(children=[
