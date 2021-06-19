@@ -28,7 +28,7 @@ csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
 #     """
 #   Processes data to be in proper format for analysis.
 #
-#   input: csv_file
+#   input: csv_file, and target action to be filtered in
 #   output: pandas dataframe
 #
 #   1 - Takes the CSV file from the path defined and passes it to the analytics dataframe
@@ -41,6 +41,14 @@ csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
 #     return ql_analytics
 
 def load_data(_, targeted_action = 'question_loaded'):
+	"""
+	input:
+	- targeted_action = 'question_loaded' This is the action we need to analyze
+	
+	output:
+	Pandas dataframe containing analytics data from the SQL DB
+	
+	"""
     global analytics
     sqlconn = pyodbc.connect(os.environ["DATABASE_PARAMS"])
 
@@ -49,9 +57,25 @@ def load_data(_, targeted_action = 'question_loaded'):
 
 
 def parse_columns_native_formats(df):
+	"""
+	input:
+	- df = Pandas dataframe containing analytics_data
+	
+	output:
+	Same dataframe with columns converted to numeric and datetime
+	
+	1 - Converts value (Question_ID) to numeric value
+	2 - Converts the event_timestamp to Pandas datetime format
+	
+	"""
     df['value'] = pd.to_numeric(df['value'])
     df['event_timestamp'] = pd.to_datetime(df['event_timestamp'])
 
+"""
+1- load_data() loads the data from the assigned path with the target action
+2 - parse_columns_native_formats() converts certain columns in the loaded data 
+
+"""
 analytics = load_data(csv_file_path, 'question_loaded')
 
 parse_columns_native_formats(analytics)
