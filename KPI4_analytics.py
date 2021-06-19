@@ -16,40 +16,21 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 
-app = dash.Dash(__name__)
-
-
 warnings.filterwarnings('ignore')
 
 csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
 
 
-# def load_data(csv_file_path, targeted_action='question_loaded'):
-#     """
-#   Processes data to be in proper format for analysis.
-#
-#   input: csv_file, and target action to be filtered in
-#   output: pandas dataframe
-#
-#   1 - Takes the CSV file from the path defined and passes it to the analytics dataframe
-#   2 - Extracts only the action 'question_loaded' from the entire dataset
-#   3 - Returns the extracted dataframe ql_analytics
-#
-#   """
-#     analytics = pd.read_csv(csv_file_path)
-#     ql_analytics = analytics.loc[analytics['Action'] == targeted_action]
-#     return ql_analytics
 
-def load_data(_, targeted_action = 'question_loaded'):
-	"""
-	input:
-	- targeted_action = 'question_loaded' This is the action we need to analyze
-	
-	output:
-	Pandas dataframe containing analytics data from the SQL DB
-	
-	"""
-    global analytics
+def load_data(_, targeted_action='question_loaded'):
+    """
+    input:
+    - targeted_action = 'question_loaded' This is the action we need to analyze
+
+    output:
+    Pandas dataframe containing analytics data from the SQL DB
+
+    """
     sqlconn = pyodbc.connect(os.environ["DATABASE_PARAMS"])
 
     analytics = pd.read_sql("SELECT * FROM analytics_data", sqlconn)
@@ -57,28 +38,25 @@ def load_data(_, targeted_action = 'question_loaded'):
 
 
 def parse_columns_native_formats(df):
-	"""
-	input:
-	- df = Pandas dataframe containing analytics_data
-	
-	output:
-	Same dataframe with columns converted to numeric and datetime
-	
-	1 - Converts value (Question_ID) to numeric value
-	2 - Converts the event_timestamp to Pandas datetime format
-	
-	"""
+    """
+    input:
+    - df = Pandas dataframe containing analytics_data
+
+    output:
+    Same dataframe with columns converted to numeric and datetime
+
+    1 - Converts value (Question_ID) to numeric value
+    2 - Converts the event_timestamp to Pandas datetime format
+
+    """
+
     df['value'] = pd.to_numeric(df['value'])
     df['event_timestamp'] = pd.to_datetime(df['event_timestamp'])
 
-"""
-1- load_data() loads the data from the assigned path with the target action
-2 - parse_columns_native_formats() converts certain columns in the loaded data 
 
-"""
 analytics = load_data(csv_file_path, 'question_loaded')
-
 parse_columns_native_formats(analytics)
+
 
 def compute_time_differences(df, session_id, timestamp, difference_column):
     """
@@ -115,8 +93,6 @@ def compute_time_differences(df, session_id, timestamp, difference_column):
     return df
 
 
-
-
 def aggregate_questions_revisited(df2, session_id, value_column, difference_column):
     """
        Combines the time taken on questions that were revisted multiple times by the user.
@@ -145,8 +121,6 @@ def aggregate_questions_revisited(df2, session_id, value_column, difference_colu
     return time_df
 
 
-
-
 def remove_abnormal_use_data(time_df, session_id, difference_column, filter_threshold):
     """
         Removes all questionnaire data associated with any user that takes less than 2 seconds.
@@ -173,7 +147,6 @@ def remove_abnormal_use_data(time_df, session_id, difference_column, filter_thre
     time_df_filtered = time_df_with_filter[time_df_with_filter.filter_pass == True]
 
     return time_df_filtered
-
 
 
 # OPTION 2 for filtering
@@ -213,7 +186,6 @@ def drop_off(time_df_filtered, session_id, groupby_column):
     print("The number of Unique Users are  = ", time_df2['Unique_Users'].max())
 
     return time_df2
-
 
 
 def swarm_plot(time_df_filtered, x_column, y_column, x_axis_label, y_axis_label, graph_title, image_name):
@@ -260,8 +232,6 @@ def swarm_plot(time_df_filtered, x_column, y_column, x_axis_label, y_axis_label,
     return ax
 
 
-
-
 def dropoff_plot(time_df2, x_column, y_column, x_axis_label, y_axis_label, graph_title, image_name):
     """
   	Creates graph of data dropoff
@@ -299,7 +269,6 @@ def dropoff_plot(time_df2, x_column, y_column, x_axis_label, y_axis_label, graph
     ax.figure.savefig(image_name)
 
     return ax
-
 
 
 """PLOTLY FUNCTIONS"""
@@ -351,7 +320,6 @@ def plotly_lineplot(time_df2, x_column, y_column, x_axis_label, y_axis_label, gr
     return fig
 
 
-
 def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis_label, graph_title, image_name):
     """
     input:
@@ -387,15 +355,11 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
                       xaxis_title=x_axis_label,
                       yaxis_title=y_axis_label,
                       autosize=False,
-                      width=1500,
-                      height=1500,
                       font=dict(family="Courier New, monospace",
                                 size=18,
                                 color="RebeccaPurple"))
 
-
     return fig
-
 
 
 def KPI4_analysis(data):
@@ -416,8 +380,6 @@ def KPI4_analysis(data):
    7 - Creates a Line plot using drop_off_data and other plotting parameters
    
  """
-
-
 
     time_differences = compute_time_differences(data, 'session_uuid', 'event_timestamp', 'Secs')
 
@@ -449,20 +411,16 @@ def KPI4_analysis(data):
 
 
 
-
-
-@app.callback([
-    dash.dependencies.Output("kpi4-graph", "figure"),
-    dash.dependencies.Output("sample-size-header", "children"),
-
-    # Show the raw data as a table.
-    dash.dependencies.Output("dropoff-graph", "figure")],
-
-    [
-        dash.dependencies.Input('date-picker-range', 'start_date'),
-        dash.dependencies.Input('date-picker-range', 'end_date')
-    ])
 def kpi4(sd, ed):
+    """
+    Callback function that runs everytime a filter is changed on client-side. Re-renders the plots using
+    the new filter parameters.
+
+    Currently, only date (from date and to date) filters are supported
+    :param sd: start_date (automatically filled out by Dash, in ISO format
+    :param ed: end_date (same format as start_date)
+    :return: tuple of violin plot (plotly graph object), sample size text, and dropoff-graph
+    """
     if not (sd and ed):
         return dash.no_update, dash.no_update, dash.no_update
     fromdate = datetime.fromisoformat(sd)
@@ -471,59 +429,77 @@ def kpi4(sd, ed):
     date_filtered_analytics = analytics[
         (analytics["event_timestamp"] >= fromdate) & (analytics["event_timestamp"] <= todate)]
 
-    # analytics["event_timestamp"] = pd.to_datetime(analytics["event_timestamp"])
-
     violin, line = KPI4_analysis(date_filtered_analytics)
     return violin, "", line
 
-"""
-Once everything above is executed, use the below function to get the plots saved to your system
 
-"""
+def run_dash_app():
+    """
+    Start the dash app, initialize the Dash layout, and run the server in Debug mode.
+    This function will never exit.
+    """
+    app = dash.Dash(__name__)
 
+    data_table_layout =
 
-data_table_layout = html.Div(children=[
-    html.H2(
-        children="Question response time vs. question order for each session_uuid (in seconds)."
-    ),
-    html.H2(
-        children="# of question completions vs question order"
-    ),
-    dcc.Graph(
-        id="dropoff-graph"
-    )
-])
+    # Defines how the website will look and the positioning of the elements.
+    app.layout = html.Div(children=[
+        html.H1(children='ClimateMind analytics'),
+        html.Div(
+            children=[
+                html.H2(children="KPI4 - Average reading time per question"),
+                dcc.Graph(
+                    id='kpi4-graph',
+                    style={
+                        "height": "600px"
+                    }
+                ),
+                dcc.DatePickerRange(
+                    id='date-picker-range',
+                    start_date=date(2018, 1, 1),
+                    end_date=datetime.now(),
+                    initial_visible_month=datetime.now()
+                ),
+                html.P(
+                    children=["Sample size: ", 0],
+                    id="sample-size-header"
+                ),
+                html.Hr(),
+                html.Div(children=[
+                    dcc.Graph(
+                        id="dropoff-graph"
+                    )
+                ]),
+                html.H3(
+                    children=f"Latest event: {analytics.iloc[-1].event_timestamp}"
+                )
+            ], style={
+                'max-width': '1000px'
+            }, ),
 
-app.layout = html.Div(children=[
-    html.H1(children='ClimateMind analytics'),
+    ])
 
-    html.Div(
-        children=[
-            html.H2(children="KPI4 - Average reading time per question"),
-            dcc.Graph(
-                id='kpi4-graph'
-            ),
-            dcc.DatePickerRange(
-                id='date-picker-range',
-                start_date=date(2018, 1, 1),
-                end_date=datetime.now(),
-                initial_visible_month=datetime.now()
-            ),
-            html.P(
-                children=["Sample size: ", 0],
-                id="sample-size-header"
-            ),
-            html.Hr(),
-            data_table_layout,
+    @app.callback([
+        # Violin plot
+        dash.dependencies.Output("kpi4-graph", "figure"),
 
-            html.H3(
-                children=f"Latest event: {analytics.iloc[-1].event_timestamp}"
-            )
-        ], style={
-            'max-width': '1000px'
-        }, ),
+        # Shows the sample size as a header text
+        dash.dependencies.Output("sample-size-header", "children"),
 
-])
-
-if __name__ == '__main__':
+        # Drop-off line chart
+        dash.dependencies.Output("dropoff-graph", "figure")],
+        [
+            dash.dependencies.Input('date-picker-range', 'start_date'),
+            dash.dependencies.Input('date-picker-range', 'end_date')
+        ])
+    def kpi4_inner(*args):
+        """
+        Register a callback with the app. Since Dash callbacks are registered using function decorators,
+        we make a closure function that calls an outer function
+        """
+        return kpi4(*args)
     app.run_server(debug=True, dev_tools_hot_reload=False)
+
+
+if __name__ == "__main__":
+    run_dash_app()
