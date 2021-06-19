@@ -21,7 +21,6 @@ warnings.filterwarnings('ignore')
 csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
 
 
-
 def load_data(_, targeted_action='question_loaded'):
     """
     input:
@@ -359,6 +358,15 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
                                 size=18,
                                 color="RebeccaPurple"))
 
+    fig.add_annotation(
+        yref="y domain",
+        xref="x domain",
+        y=1.0,
+        x=1.0,
+        text=f"N: {len(time_df_filtered)} question answers",
+        showarrow=False
+    )
+
     return fig
 
 
@@ -410,7 +418,6 @@ def KPI4_analysis(data):
     return violin_plot, line_plot
 
 
-
 def kpi4(sd, ed):
     """
     Callback function that runs everytime a filter is changed on client-side. Re-renders the plots using
@@ -439,7 +446,6 @@ def run_dash_app():
     This function will never exit.
     """
     app = dash.Dash(__name__)
-
 
     # Defines how the website will look and the positioning of the elements.
     app.layout = html.Div(children=[
@@ -497,6 +503,7 @@ def run_dash_app():
         we make a closure function that calls an outer function
         """
         return kpi4(*args)
+
     app.run_server(debug=True, dev_tools_hot_reload=False)
 
 
