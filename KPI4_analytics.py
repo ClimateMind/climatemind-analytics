@@ -62,6 +62,9 @@ def compute_time_differences(df, session_id, timestamp, difference_column):
 
 	input: 
 	- df = Pandas dataframe from previous function
+	- session_id = Questionnaire_Session_ID in this case. Can also be session_uuid
+	- timestamp = The original event timestamp in the analytics data
+	- difference_column = To store the extracted seconds/minutes from the interval. Seconds in this case
 
 	output:
 	 pandas dataframe with additional column 'Secs' that is the time interval between consecutive timepoints
@@ -96,6 +99,9 @@ def aggregate_questions_revisited(df2, session_id, value_column, difference_colu
 
        inputs:
        - df = pandas dataframe of the data
+       - session_id = Questionnaire_Session_ID in this case. Can also be session_uuid
+       - value_column = The value for the each label in the analytics data. In this case, it is the Question_ID for each question_loaded action
+       - difference_column = To store the extracted seconds/minutes from the interval. Seconds in this case
 
        output:
         dataframe of the session_id, value_column, and summed difference_column
@@ -122,10 +128,13 @@ def remove_abnormal_use_data(time_df, session_id, difference_column, filter_thre
         Removes all questionnaire data associated with any user that takes less than 2 seconds.
 
       inputs:
-      time_df = pandas dataframe from previous function
+      - time_df = pandas dataframe from previous function
+      - session_id = Questionnaire_Session_ID in this case. Can also be session_uuid
+      - difference_column = To store the extracted seconds/minutes from the interval. Seconds in this case
+      - filter_threshold = Argument to accept only those responses that took greater than 2 or 3 seconds. 
 
       output:
-      dataframe of users whose minimum time answering is greater than 2 seconds
+      dataframe of users whose minimum time answering is greater than 2 or 3 seconds
 
       1 - Regroup by Questionnaire_Session_ID to get minimum seconds for each
       2 - Add a filter_pass column to take in Sessions with time greater than 2 seconds
@@ -154,8 +163,9 @@ def drop_off(time_df_filtered, session_id, groupby_column):
       Computes the drop_off % of each value in the df.
 
       inputs:
-      time_df_filtered = pandas dataframe with no abnormal data
-      groupby_column = column with the value to group by
+      - time_df_filtered = pandas dataframe with no abnormal data
+      - session_id = Questionnaire_Session_ID in this case. Can also be session_uuid
+      - groupby_column = column with the value to group by
 
       output:
       pandas data frame of value_column and % dropoff.
@@ -275,14 +285,14 @@ def plotly_lineplot(time_df2, x_column, y_column, x_axis_label, y_axis_label, gr
     """
     input:
     time_df2 = pandas dataframe containing the data to plot
-	x_column = x axis data for the plot
-	y_column = y axis data for the plot
-	x_axis_label = label for the x-axis on the plot
-	y_axis_label = label for the y-axis on the plot
-	graph_title = title for the plot
+    x_column = x axis data for the plot
+    y_column = y axis data for the plot
+    x_axis_label = label for the x-axis on the plot
+    y_axis_label = label for the y-axis on the plot
+    graph_title = title for the plot
     image_name = Name for image to be saved
-
-	output:
+    
+    output:
 	labeled Plotly Line Plot object 
     
     1 - Creates a Plot using assigned dataframe and X and Y axes
@@ -322,11 +332,11 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
     """
     input:
     time_df2 = pandas dataframe containing the data to plot
-	x_column = x axis data for the plot
-	y_column = y axis data for the plot
-	x_axis_label = label for the x-axis on the plot
-	y_axis_label = label for the y-axis on the plot
-	graph_title = title for the plot
+    x_column = x axis data for the plot
+    y_column = y axis data for the plot
+    x_axis_label = label for the x-axis on the plot
+    y_axis_label = label for the y-axis on the plot
+    graph_title = title for the plot
     image_name = Name for image to be saved
 
 	output:
