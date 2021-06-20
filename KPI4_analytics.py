@@ -316,6 +316,14 @@ def plotly_lineplot(time_df2, x_column, y_column, x_axis_label, y_axis_label, gr
                                 size=18,
                                 color="RebeccaPurple"))
 
+    fig.add_annotation(
+        yref="y domain",
+        xref="x domain",
+        y=1.0,
+        x=1.0,
+        text=f"N: {time_df2['Unique_Users'].max()} users",
+        showarrow=False
+    )
     return fig
 
 
@@ -363,7 +371,7 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
         xref="x domain",
         y=1.0,
         x=1.0,
-        text=f"N: {len(time_df_filtered)} question answers",
+        text=f"N: {time_df_filtered['session_uuid'].nunique()} users",
         showarrow=False
     )
 
