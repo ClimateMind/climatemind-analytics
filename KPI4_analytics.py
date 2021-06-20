@@ -141,7 +141,7 @@ def remove_abnormal_use_data(time_df, session_id, difference_column, filter_thre
     """
 
     time_filter = time_df.groupby([session_id], sort=False).min(difference_column).reset_index()
-    time_filter['filter_pass'] = time_filter[difference_column] > filter_threshold
+    time_filter['filter_pass'] = time_filter[difference_column] >= filter_threshold
     time_df_with_filter = time_df.merge(time_filter[[session_id, 'filter_pass']], on=session_id)
     time_df_filtered = time_df_with_filter[time_df_with_filter.filter_pass == True]
 
@@ -176,13 +176,17 @@ def drop_off(time_df_filtered, session_id, groupby_column):
 
     """
     time_df2 = pd.DataFrame()
-    time_df2['Unique_Users'] = time_df_filtered.groupby([groupby_column])[session_id].nunique()
-    time_df2.sort_values(by=[groupby_column], ascending=False, inplace=True)
-    time_df2['User Interval'] = time_df2['Unique_Users'] / time_df2['Unique_Users'].max()
-    time_df2.reset_index(inplace=True)
-    time_df2['User Interval %'] = (time_df2['User Interval'] * 100)
 
-    print("The number of Unique Users are  = ", time_df2['Unique_Users'].max())
+    if not time_df_filtered.empty:
+        time_df2['Unique_Users'] = time_df_filtered.groupby([groupby_column])[session_id].nunique()
+        time_df2.sort_values(by=[groupby_column], ascending=False, inplace=True)
+        time_df2['User Interval'] = time_df2['Unique_Users'] / time_df2['Unique_Users'].max()
+        time_df2.reset_index(inplace=True)
+        time_df2['User Interval %'] = (time_df2['User Interval'] * 100)
+
+        print("The number of Unique Users are  = ", time_df2['Unique_Users'].max())
+    else:
+        time_df2 = pd.DataFrame(columns=['value', 'Unique_Users', "User Interval", "User Interval %"])
 
     return time_df2
 
@@ -268,8 +272,8 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
     
     """
 
-    fig = px.violin(time_df_filtered, x=time_df_filtered[x_column], y=time_df_filtered[y_column], box=True,
-                    points='all', color=time_df_filtered[x_column])
+    fig = px.violin(time_df_filtered, x=x_column, y=y_column, box=True,
+                    points='all', color=None if time_df_filtered.empty else x_column)
 
     fig.update_xaxes(range=[1, 11], dtick=1)
 
@@ -295,7 +299,7 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
     return fig
 
 
-def KPI4_analysis(data):
+def KPI4_analysis(data, min_answer_time):
     """
    Runs all the analytics functions.
 
@@ -318,7 +322,7 @@ def KPI4_analysis(data):
 
     revisits_summed = aggregate_questions_revisited(time_differences, 'session_uuid', 'value', 'Secs')
 
-    cleaned_data = remove_abnormal_use_data(revisits_summed, 'session_uuid', 'Secs', -1)
+    cleaned_data = remove_abnormal_use_data(revisits_summed, 'session_uuid', 'Secs', min_answer_time)
 
     drop_off_data = drop_off(cleaned_data, 'session_uuid', 'value')
 
@@ -343,7 +347,7 @@ def KPI4_analysis(data):
     return violin_plot, line_plot
 
 
-def kpi4(sd, ed):
+def kpi4(sd, ed, min_answer_time):
     """
     Callback function that runs everytime a filter is changed on client-side. Re-renders the plots using
     the new filter parameters.
@@ -361,7 +365,7 @@ def kpi4(sd, ed):
     date_filtered_analytics = analytics[
         (analytics["event_timestamp"] >= fromdate) & (analytics["event_timestamp"] <= todate)]
 
-    violin, line = KPI4_analysis(date_filtered_analytics)
+    violin, line = KPI4_analysis(date_filtered_analytics, min_answer_time)
     return violin, "", line
 
 
@@ -389,6 +393,17 @@ def run_dash_app():
                     start_date=date(2018, 1, 1),
                     end_date=datetime.now(),
                     initial_visible_month=datetime.now()
+                ),
+                html.H3(
+                    children="Minimum question answer time threshold (seconds)"
+                ),
+                dcc.Slider(
+                    id='min-question-time-slider',
+                    min=0,
+                    max=10,
+                    step=1,
+                    value=0,
+                    tooltip={"always_visible": True}
                 ),
                 html.P(
                     children=["Sample size: ", 0],
@@ -420,7 +435,8 @@ def run_dash_app():
         dash.dependencies.Output("dropoff-graph", "figure")],
         [
             dash.dependencies.Input('date-picker-range', 'start_date'),
-            dash.dependencies.Input('date-picker-range', 'end_date')
+            dash.dependencies.Input('date-picker-range', 'end_date'),
+            dash.dependencies.Input('min-question-time-slider', 'value')
         ])
     def kpi4_inner(*args):
         """
