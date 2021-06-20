@@ -3,6 +3,7 @@ import plotly.express as px
 import os
 import warnings
 import pyodbc
+from datetime import date, datetime
 
 import pandas as pd
 import dash
@@ -26,7 +27,10 @@ def load_data(_, targeted_action='question_loaded'):
 
     if "DATABASE_PARAMS" not in os.environ:
         raise RuntimeError("Environment variable DATABASE_PARAMS not detected")
+
     sqlconn = pyodbc.connect(os.environ["DATABASE_PARAMS"])
+
+
 
     analytics = pd.read_sql("SELECT * FROM analytics_data", sqlconn)
     return analytics.loc[analytics['action'] == targeted_action]
