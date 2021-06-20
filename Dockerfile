@@ -18,4 +18,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 
 COPY . .
-ENTRYPOINT ["python", "KPI4_analytics.py"]
+ENTRYPOINT ["python3", "KPI4_analytics.py"]
