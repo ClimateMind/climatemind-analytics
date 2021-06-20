@@ -1,17 +1,10 @@
-from datetime import datetime, date
-
-import pandas as pd
-import numpy as np
-import seaborn as sns
-
-sns.set_theme(style="whitegrid")
-import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.express as px
 import os
 import warnings
 import pyodbc
 
+import pandas as pd
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -30,6 +23,9 @@ def load_data(_, targeted_action='question_loaded'):
     Pandas dataframe containing analytics data from the SQL DB
 
     """
+
+    if "DATABASE_PARAMS" not in os.environ:
+        raise RuntimeError("Environment variable DATABASE_PARAMS not detected")
     sqlconn = pyodbc.connect(os.environ["DATABASE_PARAMS"])
 
     analytics = pd.read_sql("SELECT * FROM analytics_data", sqlconn)
@@ -185,89 +181,6 @@ def drop_off(time_df_filtered, session_id, groupby_column):
     print("The number of Unique Users are  = ", time_df2['Unique_Users'].max())
 
     return time_df2
-
-
-def swarm_plot(time_df_filtered, x_column, y_column, x_axis_label, y_axis_label, graph_title, image_name):
-    """
-      Creates swarm plot with overlayed box plot of the data.
-
-      inputs:
-      time_df_filtered = pandas dataframe containing the data to plot
-      x_column = x axis data for the plot
-      y_column = y axis data for the plot
-      x_axis_label = label for the x-axis on the plot
-      y_axis_label = label for the y-axis on the plot
-      graph_title = title for the plot
-      image_name = Name for the image to be saved
-
-      output:
-      labeled graph object
-
-      1 , 2 - Sets the figure dimensions
-      3 - Creates a Seaborn Boxplot with assigned function inputs as parameters
-      4 - Creates a Seaborn Swarmplot with assigned function inputs as parameters
-      5 - Inverts the X-axis as we want X axis to be from 10 to 1
-      6 , 7 - Sets X and Y axis labels as per input provided
-      8 - Saves the resultant plot to your system
-      9 - Returns the plot for viewing
-
-    """
-
-    fig = plt.gcf()
-    fig.set_size_inches(15, 10)
-
-    ax = sns.boxplot(x=time_df_filtered[x_column], y=time_df_filtered[y_column],
-                     data=time_df_filtered, whis=np.inf, fliersize=20).set(title=graph_title)
-    ax = sns.swarmplot(x=time_df_filtered[x_column], y=time_df_filtered[y_column],
-                       data=time_df_filtered, color=".2", size=5)
-
-    ax.invert_xaxis()
-
-    ax.set_xlabel(x_axis_label)
-    ax.set_ylabel(y_axis_label)
-
-    ax.figure.savefig(image_name)
-
-    return ax
-
-
-def dropoff_plot(time_df2, x_column, y_column, x_axis_label, y_axis_label, graph_title, image_name):
-    """
-  	Creates graph of data dropoff
-
-  	inputs:
-  	time_df2 = pandas dataframe containing the data to plot
-	x_column = x axis data for the plot
-	y_column = y axis data for the plot
-	x_axis_label = label for the x-axis on the plot
-	y_axis_label = label for the y-axis on the plot
-	graph_title = title for the plot
-    image_name = Name for image to be saved
-
-	output:
-	labeled graph object
-    
-    1- Sets the dimensions for the Line Plot
-    2 - Creates a Seaborn Lineplot with assigned dataframe and columns
-    3 - Sets X and Y axis labels and Title for the graph
-    4 - Inverts the X-axis to have order from 10 to 1
-    5 - Saves the resultant plot to your system
-    6 - Returns the plot for viewing
-    
-    
-  """
-
-    plt.figure(figsize=(20, 9))
-
-    ax = sns.lineplot(data=time_df2, x=time_df2[x_column], y=time_df2[y_column], markers=True)
-
-    ax.set(xlabel=x_axis_label, ylabel=y_axis_label, title=graph_title)
-
-    ax.invert_xaxis()
-
-    ax.figure.savefig(image_name)
-
-    return ax
 
 
 """PLOTLY FUNCTIONS"""
@@ -512,7 +425,7 @@ def run_dash_app():
         """
         return kpi4(*args)
 
-    app.run_server(debug=True, dev_tools_hot_reload=False)
+    app.run_server(host="0.0.0.0", port=8050, debug=True, dev_tools_hot_reload=False)
 
 
 if __name__ == "__main__":
