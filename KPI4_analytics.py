@@ -397,13 +397,13 @@ def run_dash_app():
                 html.H3(
                     children="Minimum question answer time threshold (seconds)"
                 ),
-                dcc.Slider(
+                dcc.Input(
                     id='min-question-time-slider',
+                    type= "number",
+                    placeholder = "Time (Default 0 seconds)",
                     min=0,
-                    max=10,
                     step=1,
                     value=0,
-                    tooltip={"always_visible": True}
                 ),
                 html.P(
                     children=["Sample size: ", 0],
