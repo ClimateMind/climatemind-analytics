@@ -416,7 +416,7 @@ def run_dash_app():
                     )
                 ]),
                 html.H3(
-                    children=f"Latest event: {analytics.iloc[-1].event_timestamp}"
+                    children=f"Latest event: {analytics.event_timestamp.max()}"
                 )
             ], style={
                 'max-width': '1000px'
