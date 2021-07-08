@@ -400,10 +400,10 @@ def run_dash_app():
                 dcc.Input(
                     id='min-question-time-slider',
                     type= "number",
-                    placeholder = "Time (Default 0 seconds)",
+                    placeholder = "Time (Default 3 seconds)",
                     min=0,
                     step=1,
-                    value=0,
+                    value=3,
                 ),
                 html.P(
                     children=["Sample size: ", 0],
