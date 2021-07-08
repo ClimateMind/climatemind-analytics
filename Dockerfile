@@ -18,4 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 
 COPY . .
+
+EXPOSE 8050
 ENTRYPOINT ["python3", "KPI4_analytics.py"]
