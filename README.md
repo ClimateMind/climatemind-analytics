@@ -16,4 +16,4 @@ To use the standalone script:
 7. Run the CM_analytics.py script.
 
 # KPI4
-![image](/kpi4%20usage.gif)
+![questionnaire_dashboard usage](https://user-images.githubusercontent.com/19840874/126049366-e29cba90-2451-4298-ba4e-4d9262121828.gif)
