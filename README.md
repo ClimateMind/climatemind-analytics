@@ -14,3 +14,6 @@ To use the standalone script:
 5. Run ```pip install -r requirements.txt```
 6. Add the secret.json and secret_db_credentials.py files to your project. **Note**: make sure that your files are named exactly as written here to ensure they are imported correctly and are ignored correctly by Git. 
 7. Run the CM_analytics.py script.
+
+# KPI4
+![image](/kpi4%20usage.gif)
