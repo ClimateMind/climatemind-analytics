@@ -10,15 +10,17 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 
+
+
 warnings.filterwarnings('ignore')
 
 csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
 
 
-def load_data(_, targeted_action='question_loaded'):
+def load_data(_, targeted_actions=['question_loaded','questionnaire_finish']):
     """
     input:
-    - targeted_action = 'question_loaded' This is the action we need to analyze
+    - targeted_actions = list of strings ex: 'question_loaded' This is the action we need to analyze
 
     output:
     Pandas dataframe containing analytics data from the SQL DB
@@ -30,10 +32,19 @@ def load_data(_, targeted_action='question_loaded'):
 
     sqlconn = pyodbc.connect(os.environ["DATABASE_PARAMS"])
 
+    #for each targeted action, only load in that data
+    #SELECT * FROM analytics_data WHERE (action = 'question_loaded') OR (action = 'questionnaire_finish')
+
+    begin_str = "SELECT * FROM analytics_data WHERE (action = '"
+    fill_str = "') OR (action = '"
+    middle_str = fill_str.join(targeted_actions)
+    final_str = "')"
+    complete_query = begin_str+middle_str+final_str
+
+    data_of_interest = pd.read_sql(complete_query, sqlconn)
 
 
-    analytics = pd.read_sql("SELECT * FROM analytics_data", sqlconn)
-    return analytics.loc[analytics['action'] == targeted_action]
+    return data_of_interest
 
 
 def parse_columns_native_formats(df):
@@ -48,12 +59,12 @@ def parse_columns_native_formats(df):
     2 - Converts the event_timestamp to Pandas datetime format
 
     """
-
+    df.loc[df["action"]=="questionnaire_finish", "value"] = "0"
     df['value'] = pd.to_numeric(df['value'])
     df['event_timestamp'] = pd.to_datetime(df['event_timestamp'])
 
 
-analytics = load_data(csv_file_path, 'question_loaded')
+analytics = load_data(csv_file_path, ['question_loaded','questionnaire_finish'])
 parse_columns_native_formats(analytics)
 
 
@@ -82,17 +93,16 @@ def compute_time_differences(df, session_id, timestamp, difference_column):
     df[timestamp] = pd.to_datetime(df[timestamp])
 
     sorted_df = df.sort_values(by=[session_id, timestamp], ascending=True)
+    sorted_df['Lag_event_timestamp'] = sorted_df.groupby([session_id])[timestamp].shift(1)
+    sorted_df['Interval'] = sorted_df[timestamp] - sorted_df['Lag_event_timestamp']
+    sorted_df["difference"] = sorted_df['Interval'].dt.total_seconds()
 
-    df['Lag_event_timestamp'] = sorted_df.groupby([session_id])[timestamp].shift(1)
+    sorted_df[difference_column] = sorted_df.difference.shift(-1)
 
-    df['Interval'] = df[timestamp] - df['Lag_event_timestamp']
-
-    df[difference_column] = df['Interval'].dt.components['seconds']
-
-    return df
+    return sorted_df
 
 
-def aggregate_questions_revisited(df2, session_id, value_column, difference_column):
+def aggregate_questions_revisited(df2, session_id, value_column, difference_column, min_question_id, max_question_id):
     """
        Combines the time taken on questions that were revisted multiple times by the user.
 
@@ -112,11 +122,10 @@ def aggregate_questions_revisited(df2, session_id, value_column, difference_colu
       5 - Returns the processed dataframe
 
     """
-
     time = df2.groupby([session_id, value_column], sort=False)[difference_column].sum()
     time_df = pd.DataFrame(time)
     time_df.reset_index(inplace=True)
-    time_df = time_df.loc[time_df[value_column] < 20]
+    time_df = time_df.loc[ (time_df[value_column] >= min_question_id) & (time_df[value_column] < max_question_id), ]
     return time_df
 
 
@@ -320,7 +329,7 @@ def KPI4_analysis(data, min_answer_time):
 
     time_differences = compute_time_differences(data, 'session_uuid', 'event_timestamp', 'Secs')
 
-    revisits_summed = aggregate_questions_revisited(time_differences, 'session_uuid', 'value', 'Secs')
+    revisits_summed = aggregate_questions_revisited(time_differences, 'session_uuid', 'value', 'Secs', 1, 20)
 
     cleaned_data = remove_abnormal_use_data(revisits_summed, 'session_uuid', 'Secs', min_answer_time)
 
@@ -375,6 +384,7 @@ def run_dash_app():
     This function will never exit.
     """
     app = dash.Dash(__name__)
+    #application = app.server
 
     # Defines how the website will look and the positioning of the elements.
     app.layout = html.Div(children=[
