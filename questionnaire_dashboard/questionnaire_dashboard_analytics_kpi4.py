@@ -14,10 +14,10 @@ import dash_html_components as html
 
 warnings.filterwarnings('ignore')
 
-csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
+#csv_file_path = 'Path to the CSV file/page_by_session90-2.csv'
 
 
-def load_data(_, targeted_actions=['question_loaded','questionnaire_finish']):
+def load_data(targeted_actions=['question_loaded','questionnaire_finish']):
     """
     input:
     - targeted_actions = list of strings ex: 'question_loaded' This is the action we need to analyze
@@ -59,13 +59,15 @@ def parse_columns_native_formats(df):
     2 - Converts the event_timestamp to Pandas datetime format
 
     """
-    df.loc[df["action"]=="questionnaire_finish", "value"] = "0"
-    df['value'] = pd.to_numeric(df['value'])
+    df.loc[df["action"]=="questionnaire_finish", "value"] = "0:0"
+    #df['value'] = pd.to_numeric(df['value'])
     df['event_timestamp'] = pd.to_datetime(df['event_timestamp'])
 
+#convert the 'value' column results to numeric in other places in the script, AFTER FILTERING ROWS!
 
-analytics = load_data(csv_file_path, ['question_loaded','questionnaire_finish'])
-parse_columns_native_formats(analytics)
+#analytics = load_data(csv_file_path, ['question_loaded','questionnaire_finish'])
+#analytics = load_data(['question_loaded','questionnaire_finish'])
+#parse_columns_native_formats(analytics)
 
 
 def compute_time_differences(df, session_id, timestamp, difference_column):
@@ -79,7 +81,7 @@ def compute_time_differences(df, session_id, timestamp, difference_column):
 	- difference_column = To store the extracted seconds/minutes from the interval. Seconds in this case
 
 	output:
-	 pandas dataframe with additional column 'Secs' that is the time interval between consecutive timepoints
+	 pandas dataframe with additional column 'difference_column' that is the time interval between consecutive timepoints
      
      1 - Converts event_timestamp to Pandas Datetime format
      2- Sorts the dataframe by Questionnaire_Session_ID and event_timestamp in ascending order
@@ -158,7 +160,7 @@ def remove_abnormal_use_data(time_df, session_id, difference_column, filter_thre
 
 
 # OPTION 2 for filtering
-# minimums = time_df.groupby(['session_uuid'], sort = False)['Secs'].min() > 2.0
+# minimums = time_df.groupby(['session_uuid'], sort = False)['difference_column'].min() > 2.0
 # keep_IDs = minimums.index[minimums].values
 # time_df_keep = time_df[time_df['session_uuid'].isin(keep_IDs)]
 
@@ -308,14 +310,18 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
     return fig
 
 
-def KPI4_analysis(data, min_answer_time):
+def KPI4_analysis(data, min_answer_time, data_sources):
     """
    Runs all the analytics functions.
 
-   input: Pandas dataframe of the data
+   inputs: 
+   data = Pandas dataframe of the data
+   min_answer_time = number (user must spend at least this much time for every question in order to include their data in the analysis )
+   data_sources = list of url(s) to include in the analysis as data sources
+
    output: png plots for the dashboard
    
-   1 - Loads the dataset from csv_file_path to data
+   1 - Loads the dataset from source
    2 - Computes the time differences to data and stores in time_differences
    3 - Aggregates the revisits to get total time and assigns it to revisits_summed
    4 - Removes developer data from the revisits_summed and stores in cleaned_data
@@ -326,16 +332,23 @@ def KPI4_analysis(data, min_answer_time):
    7 - Creates a Line plot using drop_off_data and other plotting parameters
    
  """
+    breakpoint()
+    #exclude urls with "?gtm_debug=x" in it
 
-    time_differences = compute_time_differences(data, 'session_uuid', 'event_timestamp', 'Secs')
+    #otherwise select anything that matches? or just sub
 
-    revisits_summed = aggregate_questions_revisited(time_differences, 'session_uuid', 'value', 'Secs', 1, 20)
+    #subset the data based on the data_sources
+    data = data[data['page_url'].isin(data_urls)]
 
-    cleaned_data = remove_abnormal_use_data(revisits_summed, 'session_uuid', 'Secs', min_answer_time)
+    time_differences = compute_time_differences(data, 'session_uuid', 'event_timestamp', 'duration')
+
+    revisits_summed = aggregate_questions_revisited(time_differences, 'session_uuid', 'value', 'duration', 1, 20)
+
+    cleaned_data = remove_abnormal_use_data(revisits_summed, 'session_uuid', 'duration', min_answer_time)
 
     drop_off_data = drop_off(cleaned_data, 'session_uuid', 'value')
 
-    # swarm_plot_graph = swarm_plot(cleaned_data, 'value', 'Secs', 'Question_ID',
+    # swarm_plot_graph = swarm_plot(cleaned_data, 'value', 'duration', 'Question_ID',
     #                               'Time taken to answer (Seconds)', 'Total time taken to answer each question',
     #                               'Swarm Plot.png')
     #
@@ -343,7 +356,7 @@ def KPI4_analysis(data, min_answer_time):
     #                                   'Question_ID', 'User Interval %', 'User Drop-off Graph',
     #                                   'Line Plot.png')
 
-    violin_plot = plotly_violinplot(cleaned_data, 'value', 'Secs', 'Question_ID',
+    violin_plot = plotly_violinplot(cleaned_data, 'value', 'duration', 'Question_ID',
                                     'Time taken to answer (Seconds)', 'Total time taken to answer each question',
                                     'Violin Plot.png')
 
@@ -356,14 +369,40 @@ def KPI4_analysis(data, min_answer_time):
     return violin_plot, line_plot
 
 
-def kpi4(sd, ed, min_answer_time):
+def map_to_data_urls(data_sources):
+  """
+  Maps from data_sources to data_urls.
+
+  inputs:
+  data_sources = list of user selected data_sources options
+
+  output:
+  data_urls = list of urls associated with the user selected data_sources
+  """
+  #make dictionary
+  source_dict = {
+    "localhost": "http://localhost/",
+    "test_env": "https://app-frontend-test-001.azurewebsites.net/",
+    "prod_env": "https://app-frontend-prod-001.azurewebsites.net/",
+    "app_url": "https://app.climatemind.org/"
+  }
+
+  data_urls = [source_dict[url] for url in data_sources]
+  return data_urls
+
+
+
+
+def kpi4(analytics_data_df, sd, ed, min_answer_time, data_sources):
     """
     Callback function that runs everytime a filter is changed on client-side. Re-renders the plots using
     the new filter parameters.
 
-    Currently, only date (from date and to date) filters are supported
-    :param sd: start_date (automatically filled out by Dash, in ISO format
-    :param ed: end_date (same format as start_date)
+    :param sd: start_date selected by user (automatically filled out by Dash, in ISO format)
+    :param ed: end_date selected by user (same format as start_date)
+    :min_answer_time: filter number entered by user (in seconds)
+    :data_sources: list of user options selected that map to urls for data sources
+
     :return: tuple of violin plot (plotly graph object), sample size text, and dropoff-graph
     """
     if not (sd and ed):
@@ -371,10 +410,12 @@ def kpi4(sd, ed, min_answer_time):
     fromdate = datetime.fromisoformat(sd)
     todate = datetime.fromisoformat(ed)
 
-    date_filtered_analytics = analytics[
-        (analytics["event_timestamp"] >= fromdate) & (analytics["event_timestamp"] <= todate)]
+    date_filtered_analytics = analytics_data_df[
+        (analytics_data_df["event_timestamp"] >= fromdate) & (analytics_data_df["event_timestamp"] <= todate)]
 
-    violin, line = KPI4_analysis(date_filtered_analytics, min_answer_time)
+    data_urls = map_to_data_urls(data_sources)
+
+    violin, line = KPI4_analysis(date_filtered_analytics, min_answer_time, data_urls)
     return violin, "", line
 
 
@@ -385,6 +426,11 @@ def run_dash_app():
     """
     app = dash.Dash(__name__)
     #application = app.server
+
+    #load in the data (this should only by done once!)
+    analytics = load_data(['question_loaded','questionnaire_finish'])
+    parse_columns_native_formats(analytics)
+
 
     # Defines how the website will look and the positioning of the elements.
     app.layout = html.Div(children=[
@@ -398,12 +444,27 @@ def run_dash_app():
                         "height": "600px"
                     }
                 ),
+                html.H3(
+                    children="Date range and data source(s) to include in analysis"
+                ),
                 dcc.DatePickerRange(
                     id='date-picker-range',
                     start_date=date(2018, 1, 1),
                     end_date=datetime.now(),
                     initial_visible_month=datetime.now()
                 ),
+
+                dcc.Dropdown(
+                    id='data-source-filter',
+                    options=[
+                        {'label': 'localhost', 'value': 'localhost'},
+                        {'label': 'test_env', 'value': 'test_env'},
+                        {'label': 'prod_env', 'value': 'prod_env'},
+                        {'label': 'app_url', 'value': 'app_url'}
+                    ],
+                    value=['app_url'],
+                    multi=True
+                ),  
                 html.H3(
                     children="Minimum question answer time threshold (seconds)"
                 ),
@@ -446,14 +507,16 @@ def run_dash_app():
         [
             dash.dependencies.Input('date-picker-range', 'start_date'),
             dash.dependencies.Input('date-picker-range', 'end_date'),
-            dash.dependencies.Input('min-question-time-slider', 'value')
+            dash.dependencies.Input('min-question-time-slider', 'value'),
+            dash.dependencies.Input('data-source-filter', 'other'),
         ])
-    def kpi4_inner(*args):
+    #def kpi4_inner(analytics, *args):
+    def kpi4_inner(analytics, start_date, end_date, value, other):
         """
         Register a callback with the app. Since Dash callbacks are registered using function decorators,
         we make a closure function that calls an outer function
         """
-        return kpi4(*args)
+        return kpi4(analytics, start_date, end_date, value, other)
 
     app.run_server(host="0.0.0.0", port=8050, debug=True, dev_tools_hot_reload=False)
 
