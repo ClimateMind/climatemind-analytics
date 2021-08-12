@@ -508,15 +508,15 @@ def run_dash_app():
             dash.dependencies.Input('date-picker-range', 'start_date'),
             dash.dependencies.Input('date-picker-range', 'end_date'),
             dash.dependencies.Input('min-question-time-slider', 'value'),
-            dash.dependencies.Input('data-source-filter', 'other'),
+            dash.dependencies.Input('data-source-filter', 'value'),
         ])
-    #def kpi4_inner(analytics, *args):
-    def kpi4_inner(analytics, start_date, end_date, value, other):
+    def kpi4_inner(*args):
+    #def kpi4_inner(analytics, start_date, end_date, value):
         """
         Register a callback with the app. Since Dash callbacks are registered using function decorators,
         we make a closure function that calls an outer function
         """
-        return kpi4(analytics, start_date, end_date, value, other)
+        return kpi4(analytics, *args)
 
     app.run_server(host="0.0.0.0", port=8050, debug=True, dev_tools_hot_reload=False)
 
