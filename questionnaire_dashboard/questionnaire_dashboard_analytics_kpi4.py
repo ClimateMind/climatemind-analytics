@@ -9,6 +9,8 @@ import pandas as pd
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import urllib.parse
+
 
 
 
@@ -332,13 +334,13 @@ def KPI4_analysis(data, min_answer_time, data_sources):
    7 - Creates a Line plot using drop_off_data and other plotting parameters
    
  """
-    breakpoint()
-    #exclude urls with "?gtm_debug=x" in it
-
     #otherwise select anything that matches? or just sub
 
+    #make regular expression string
+    pattern_string = "|".join(data_sources)
+
     #subset the data based on the data_sources
-    data = data[data['page_url'].isin(data_urls)]
+    data = data[data['page_url'].str.contains(pat=pattern_string, na=False)]
 
     time_differences = compute_time_differences(data, 'session_uuid', 'event_timestamp', 'duration')
 
@@ -380,11 +382,18 @@ def map_to_data_urls(data_sources):
   data_urls = list of urls associated with the user selected data_sources
   """
   #make dictionary
+  # source_dict = {
+  #   "localhost": "http://localhost/",
+  #   "test_env": "https://app-frontend-test-001.azurewebsites.net/",
+  #   "prod_env": "https://app-frontend-prod-001.azurewebsites.net/",
+  #   "app_url": "https://app.climatemind.org/"
+  # }
+
   source_dict = {
-    "localhost": "http://localhost/",
-    "test_env": "https://app-frontend-test-001.azurewebsites.net/",
-    "prod_env": "https://app-frontend-prod-001.azurewebsites.net/",
-    "app_url": "https://app.climatemind.org/"
+    "localhost": "localhost",
+    "test_env": "test",
+    "prod_env": "prod",
+    "app_url": "app.climatemind"
   }
 
   data_urls = [source_dict[url] for url in data_sources]
@@ -511,7 +520,6 @@ def run_dash_app():
             dash.dependencies.Input('data-source-filter', 'value'),
         ])
     def kpi4_inner(*args):
-    #def kpi4_inner(analytics, start_date, end_date, value):
         """
         Register a callback with the app. Since Dash callbacks are registered using function decorators,
         we make a closure function that calls an outer function
