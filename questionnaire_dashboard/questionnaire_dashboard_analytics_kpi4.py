@@ -167,6 +167,7 @@ def compute_time_differences(df, session_id, timestamp, difference_column):
     sorted_df['Interval'] = sorted_df[timestamp] - sorted_df['Lag_event_timestamp']
     sorted_df["difference"] = sorted_df['Interval'].dt.total_seconds()
 
+    #to associate the difference with how long user spent on the 1st screen (not the screen they went to upon click) (null will exist for the event that takes user off the questionnaire)
     sorted_df[difference_column] = sorted_df.difference.shift(-1)
 
     return sorted_df
@@ -197,7 +198,7 @@ def aggregate_questions_revisited(df2, session_id, value_column, question_number
     time_df = pd.DataFrame(time)
     time_df.reset_index(inplace=True)
     if question_number_column in time_df.columns.values: 
-      time_df = time_df.loc[ (time_df[question_number_column] >= min_question_id) & (time_df[question_number_column] < max_question_id), ]
+      time_df = time_df.loc[ (time_df[question_number_column] >= min_question_id) & (time_df[question_number_column] <= max_question_id), ]
     return time_df
 
 
@@ -222,14 +223,15 @@ def remove_abnormal_use_data(time_df, session_id, difference_column, filter_thre
 
     """
 
-    time_filter = time_df.groupby([session_id], sort=False).min(difference_column).reset_index()
-    time_filter['filter_pass'] = ((time_filter[difference_column] >= filter_threshold_min) & (time_filter[difference_column] <= filter_threshold_max)).values
-    time_df_with_filter = time_df.merge(time_filter[[session_id, 'filter_pass']], on=session_id)
-    #time_df_filtered = time_df_with_filter[(time_df_with_filter.filter_pass.values == True)]
-    time_df_filtered = time_df_with_filter[ (time_df_with_filter[difference_column] >= filter_threshold_min) & (time_df_with_filter[difference_column] <= filter_threshold_max)]
-
+    #time_filter = time_df.groupby([session_id], sort=False).min(difference_column).reset_index()
+    time_filter = time_df.groupby([session_id], sort=False).agg({difference_column:['min','max']}).reset_index()
+    time_filter['filter_pass'] = (time_filter[difference_column]["min"] >= filter_threshold_min) & (time_filter[difference_column]["max"] <= filter_threshold_max)
+    time_df_with_filter = time_df.merge(time_filter[[session_id,"filter_pass"]].droplevel(axis=1,level=1), on=session_id)
+    time_df_filtered = time_df_with_filter[(time_df_with_filter["filter_pass"] == True)]
+    #time_df_filtered = time_df_with_filter[ (time_df_with_filter[difference_column] >= filter_threshold_min) & (time_df_with_filter[difference_column] <= filter_threshold_max)]
     #time_df_with_filter[(time_df_with_filter.duration > 300).values]
     #time_df_filtered[(time_df_filtered.duration > 300).values]
+
     return time_df_filtered
 
 
@@ -407,18 +409,19 @@ def KPI4_analysis(data, min_answer_time, data_sources):
    
  """
     #otherwise select anything that matches? or just sub
-
     #make regular expression string
     pattern_string = "|".join(data_sources)
     #if "climatemind" then also include None values
     #subset the data based on the data_sources
     #keep
+    pattern_string="climatemind|prod"
     keep = data['page_url'].str.contains(pat=pattern_string, na=False)
     if "climatemind" in pattern_string:
       keep2 = data['page_url'].isnull()
       keep = keep | keep2
-
+    
     data = data[keep]
+
 
     time_differences = compute_time_differences(data, 'session_uuid', 'event_timestamp', 'duration')
 
@@ -471,7 +474,7 @@ def map_to_data_urls(data_sources):
     "localhost": "localhost",
     "test_env": "test",
     "prod_env": "prod",
-    "app_url": "app.climatemind"
+    "app_url": "climatemind"
   }
 
   data_urls = [source_dict[url] for url in data_sources]
