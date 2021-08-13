@@ -228,9 +228,6 @@ def remove_abnormal_use_data(time_df, session_id, difference_column, filter_thre
     time_filter['filter_pass'] = (time_filter[difference_column]["min"] >= filter_threshold_min) & (time_filter[difference_column]["max"] <= filter_threshold_max)
     time_df_with_filter = time_df.merge(time_filter[[session_id,"filter_pass"]].droplevel(axis=1,level=1), on=session_id)
     time_df_filtered = time_df_with_filter[(time_df_with_filter["filter_pass"] == True)]
-    #time_df_filtered = time_df_with_filter[ (time_df_with_filter[difference_column] >= filter_threshold_min) & (time_df_with_filter[difference_column] <= filter_threshold_max)]
-    #time_df_with_filter[(time_df_with_filter.duration > 300).values]
-    #time_df_filtered[(time_df_filtered.duration > 300).values]
 
     return time_df_filtered
 
@@ -414,7 +411,6 @@ def KPI4_analysis(data, min_answer_time, data_sources):
     #if "climatemind" then also include None values
     #subset the data based on the data_sources
     #keep
-    pattern_string="climatemind|prod"
     keep = data['page_url'].str.contains(pat=pattern_string, na=False)
     if "climatemind" in pattern_string:
       keep2 = data['page_url'].isnull()
