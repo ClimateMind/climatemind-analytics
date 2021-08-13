@@ -9,7 +9,7 @@ import pandas as pd
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import urllib.parse
+#import urllib.parse
 
 
 
@@ -49,6 +49,69 @@ def load_data(targeted_actions=['question_loaded','questionnaire_finish']):
     return data_of_interest
 
 
+def question_id_to_question_number(question_id):
+    """
+    Converts question_id to question_number but only works properly if using data with 
+    question_ids from 1-10 and if questionnaire has question_ids presented from high to low.
+    
+    input:
+    - question_id = question_id from the personal values quiz
+
+    output:
+    - question_number = number from 1 to 10 that should correspond to the position the question was displayed in the quiz
+    """
+    question_id = pd.to_numeric(question_id)
+    if question_id > 10 and question_id < 21:
+      question_number = 31 - question_id
+    elif question_id > 0 and question_id < 11:
+      question_number = 11 - question_id
+    else:
+      question_number = None
+
+    return question_number
+
+def question_id_from_value(value):
+    """
+    Converts question_id to question_number but only works properly if using data with 
+    question_ids from 1-10 and if questionnaire has question_ids presented from high to low.
+    
+    input:
+    - question_id = question_id from the personal values quiz
+
+    output:
+    - question_number = number from 1 to 10 that should correspond to the position the question was displayed in the quiz
+    """
+    if ":" in value:
+      split = value.split(":")
+      question_id = pd.to_numeric(split[0])
+      question_number = pd.to_numeric(split[1])
+    else:
+      question_id = pd.to_numeric(value)
+
+    return question_id
+
+def question_number_from_value(value):
+    """
+    Converts question_id to question_number but only works properly if using data with 
+    question_ids from 1-10 and if questionnaire has question_ids presented from high to low.
+    
+    input:
+    - question_id = question_id from the personal values quiz
+
+    output:
+    - question_number = number from 1 to 10 that should correspond to the position the question was displayed in the quiz
+    """
+    if ":" in value:
+      split = value.split(":")
+      question_id = pd.to_numeric(split[0])
+      question_number = pd.to_numeric(split[1])
+    else:
+      question_id = pd.to_numeric(value)
+      question_number = question_id_to_question_number(question_id) 
+
+    return question_number
+
+
 def parse_columns_native_formats(df):
     """
     input:
@@ -65,7 +128,10 @@ def parse_columns_native_formats(df):
     #df['value'] = pd.to_numeric(df['value'])
     df['event_timestamp'] = pd.to_datetime(df['event_timestamp'])
 
-#convert the 'value' column results to numeric in other places in the script, AFTER FILTERING ROWS!
+    #convert value column to appropriate split terms (if just number without ":" in it convert to numeric)
+    #if value column has ":" in it then split into separate column 
+    df["question_id"] = df.apply(lambda row: question_id_from_value(row.value), axis=1) #value if no ":", and if ":" present then use the value to the left of the ":"
+    df["question_number"] = df.apply(lambda row: question_number_from_value(row.value), axis=1) #if no ":" and under 11 then subtract from 10 otherwise blank, and if ":" present then use the value to the right of the ":"
 
 #analytics = load_data(csv_file_path, ['question_loaded','questionnaire_finish'])
 #analytics = load_data(['question_loaded','questionnaire_finish'])
@@ -106,7 +172,7 @@ def compute_time_differences(df, session_id, timestamp, difference_column):
     return sorted_df
 
 
-def aggregate_questions_revisited(df2, session_id, value_column, difference_column, min_question_id, max_question_id):
+def aggregate_questions_revisited(df2, session_id, value_column, question_number_column, difference_column, min_question_id, max_question_id):
     """
        Combines the time taken on questions that were revisted multiple times by the user.
 
@@ -114,6 +180,7 @@ def aggregate_questions_revisited(df2, session_id, value_column, difference_colu
        - df = pandas dataframe of the data
        - session_id = Questionnaire_Session_ID in this case. Can also be session_uuid
        - value_column = The value for the each label in the analytics data. In this case, it is the Question_ID for each question_loaded action
+       - question_number_column = the column with the question numbers
        - difference_column = To store the extracted seconds/minutes from the interval. Seconds in this case
 
        output:
@@ -126,22 +193,24 @@ def aggregate_questions_revisited(df2, session_id, value_column, difference_colu
       5 - Returns the processed dataframe
 
     """
-    time = df2.groupby([session_id, value_column], sort=False)[difference_column].sum()
+    time = df2.groupby([session_id, value_column, question_number_column], sort=False)[difference_column].sum()
     time_df = pd.DataFrame(time)
     time_df.reset_index(inplace=True)
-    time_df = time_df.loc[ (time_df[value_column] >= min_question_id) & (time_df[value_column] < max_question_id), ]
+    if question_number_column in time_df.columns.values: 
+      time_df = time_df.loc[ (time_df[question_number_column] >= min_question_id) & (time_df[question_number_column] < max_question_id), ]
     return time_df
 
 
-def remove_abnormal_use_data(time_df, session_id, difference_column, filter_threshold):
+def remove_abnormal_use_data(time_df, session_id, difference_column, filter_threshold_min, filter_threshold_max):
     """
-        Removes all questionnaire data associated with any user that takes less than 2 seconds.
+        Removes all questionnaire data associated with any user that takes less than a specific number of seconds or more than a specific number of seconds.
 
       inputs:
       - time_df = pandas dataframe from previous function
       - session_id = Questionnaire_Session_ID in this case. Can also be session_uuid
       - difference_column = To store the extracted seconds/minutes from the interval. Seconds in this case
-      - filter_threshold = Argument to accept only those responses that took greater than 2 or 3 seconds. 
+      - filter_threshold_min = Argument to accept only those responses that took greater than the specified number. 
+      - filter_threshold_max = Argument to accept only those responses that took less than the specified number. 
 
       output:
       dataframe of users whose minimum time answering is greater than 2 or 3 seconds
@@ -154,10 +223,13 @@ def remove_abnormal_use_data(time_df, session_id, difference_column, filter_thre
     """
 
     time_filter = time_df.groupby([session_id], sort=False).min(difference_column).reset_index()
-    time_filter['filter_pass'] = time_filter[difference_column] >= filter_threshold
+    time_filter['filter_pass'] = ((time_filter[difference_column] >= filter_threshold_min) & (time_filter[difference_column] <= filter_threshold_max)).values
     time_df_with_filter = time_df.merge(time_filter[[session_id, 'filter_pass']], on=session_id)
-    time_df_filtered = time_df_with_filter[time_df_with_filter.filter_pass == True]
+    #time_df_filtered = time_df_with_filter[(time_df_with_filter.filter_pass.values == True)]
+    time_df_filtered = time_df_with_filter[ (time_df_with_filter[difference_column] >= filter_threshold_min) & (time_df_with_filter[difference_column] <= filter_threshold_max)]
 
+    #time_df_with_filter[(time_df_with_filter.duration > 300).values]
+    #time_df_filtered[(time_df_filtered.duration > 300).values]
     return time_df_filtered
 
 
@@ -197,9 +269,9 @@ def drop_off(time_df_filtered, session_id, groupby_column):
         time_df2.reset_index(inplace=True)
         time_df2['User Interval %'] = (time_df2['User Interval'] * 100)
 
-        print("The number of Unique Users are  = ", time_df2['Unique_Users'].max())
+        #print("The number of Unique Users are = ", time_df2['Unique_Users'].max())
     else:
-        time_df2 = pd.DataFrame(columns=['value', 'Unique_Users', "User Interval", "User Interval %"])
+        time_df2 = pd.DataFrame(columns=[groupby_column, 'Unique_Users', "User Interval", "User Interval %"])
 
     return time_df2
 
@@ -233,9 +305,9 @@ def plotly_lineplot(time_df2, x_column, y_column, x_axis_label, y_axis_label, gr
 
     fig = go.Figure(data=go.Scatter(x=time_df2[x_column], y=time_df2[y_column]))
 
-    fig.update_xaxes(range=[1, 11], dtick=1)
+    fig.update_xaxes(range=[1, max(time_df2[x_column])], dtick=1)
 
-    fig['layout']['xaxis']['autorange'] = "reversed"
+    #fig['layout']['xaxis']['autorange'] = "reversed"
 
     fig.update_yaxes(rangemode='tozero')
 
@@ -288,9 +360,9 @@ def plotly_violinplot(time_df_filtered, x_column, y_column, x_axis_label, y_axis
     fig = px.violin(time_df_filtered, x=x_column, y=y_column, box=True,
                     points='all', color=None if time_df_filtered.empty else x_column)
 
-    fig.update_xaxes(range=[1, 11], dtick=1)
+    fig.update_xaxes(range=[1, time_df_filtered[x_column]], dtick=1)
 
-    fig['layout']['xaxis']['autorange'] = "reversed"
+    #fig['layout']['xaxis']['autorange'] = "reversed"
 
     fig.update_layout(title=graph_title,
                       xaxis_title=x_axis_label,
@@ -338,17 +410,23 @@ def KPI4_analysis(data, min_answer_time, data_sources):
 
     #make regular expression string
     pattern_string = "|".join(data_sources)
-
+    #if "climatemind" then also include None values
     #subset the data based on the data_sources
-    data = data[data['page_url'].str.contains(pat=pattern_string, na=False)]
+    #keep
+    keep = data['page_url'].str.contains(pat=pattern_string, na=False)
+    if "climatemind" in pattern_string:
+      keep2 = data['page_url'].isnull()
+      keep = keep | keep2
+
+    data = data[keep]
 
     time_differences = compute_time_differences(data, 'session_uuid', 'event_timestamp', 'duration')
 
-    revisits_summed = aggregate_questions_revisited(time_differences, 'session_uuid', 'value', 'duration', 1, 20)
+    revisits_summed = aggregate_questions_revisited(time_differences, 'session_uuid', 'value', 'question_number', 'duration', 1, 20)
 
-    cleaned_data = remove_abnormal_use_data(revisits_summed, 'session_uuid', 'duration', min_answer_time)
+    cleaned_data = remove_abnormal_use_data(revisits_summed, 'session_uuid', 'duration', min_answer_time, 300)
 
-    drop_off_data = drop_off(cleaned_data, 'session_uuid', 'value')
+    drop_off_data = drop_off(cleaned_data, 'session_uuid', 'question_number')
 
     # swarm_plot_graph = swarm_plot(cleaned_data, 'value', 'duration', 'Question_ID',
     #                               'Time taken to answer (Seconds)', 'Total time taken to answer each question',
@@ -358,12 +436,12 @@ def KPI4_analysis(data, min_answer_time, data_sources):
     #                                   'Question_ID', 'User Interval %', 'User Drop-off Graph',
     #                                   'Line Plot.png')
 
-    violin_plot = plotly_violinplot(cleaned_data, 'value', 'duration', 'Question_ID',
+    violin_plot = plotly_violinplot(cleaned_data, 'question_number', 'duration', 'question_number',
                                     'Time taken to answer (Seconds)', 'Total time taken to answer each question',
                                     'Violin Plot.png')
 
-    line_plot = plotly_lineplot(drop_off_data, 'value', 'User Interval',
-                                'Question_ID', 'User Interval %', 'User Drop-off Graph',
+    line_plot = plotly_lineplot(drop_off_data, 'question_number', 'User Interval',
+                                'question_number', 'User Interval %', 'User Drop-off Graph',
                                 'Plotly Line Plot.png')
 
     # violin_plot.show()
@@ -439,7 +517,6 @@ def run_dash_app():
     #load in the data (this should only by done once!)
     analytics = load_data(['question_loaded','questionnaire_finish'])
     parse_columns_native_formats(analytics)
-
 
     # Defines how the website will look and the positioning of the elements.
     app.layout = html.Div(children=[
